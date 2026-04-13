@@ -33,7 +33,7 @@ const SYSTEM_BIT_MAP: Record<number, string> = {
   0: 'COIN',
   1: 'SERVICE',
   2: 'TEST',
-  3: '1P_SEL',
+  3: 'SELECT',
 };
 
 export const mmlDevice = shallowRef<HIDDevice | null>(null);
@@ -91,6 +91,7 @@ async function connectToDevice(device: HIDDevice) {
     await device.open();
   }
 
+  device.removeEventListener('inputreport', onInputReport);
   device.addEventListener('inputreport', onInputReport);
 
   mmlDevice.value = device;

@@ -75,6 +75,7 @@ async function connectToDevice(device: HIDDevice) {
     await device.open();
   }
 
+  device.removeEventListener('inputreport', onInputReport);
   device.addEventListener('inputreport', onInputReport);
 
   adxDevice.value = device;

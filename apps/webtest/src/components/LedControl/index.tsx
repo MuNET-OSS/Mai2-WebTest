@@ -1,9 +1,6 @@
 import { defineComponent, ref, watch } from 'vue';
 import { debounce } from 'perfect-debounce';
-import { ledConnected, setAllLedColor, setFrameLightBrightness } from '@/devices/ledSerial';
-import { io4Connected, setTopLightColor } from '@/devices/io4';
-import { mmlConnected, mmlSetTopLightColor, mmlSetAllButtonColor, mmlSetFrameBrightness } from '@/devices/maimollerHid';
-import { deviceMode } from '@/devices/deviceMode';
+import { activeDevice } from '@/devices/deviceMode';
 import { Range } from '@munet/ui';
 import styles from './index.module.sass';
 
@@ -34,48 +31,31 @@ export default defineComponent({
     const buttonColor = ref('#ff0000');
     const frameBrightness = ref(255);
 
-    const debouncedTopSend = debounce(async (hex: string) => {
+    const sendTop = debounce(async (hex: string, setColor: (r: number, g: number, b: number) => Promise<void>) => {
       const [r, g, b] = hexToRgb(hex);
-      const mode = deviceMode.value;
-      if (mode === 'maimoller' && mmlConnected.value) {
-        await mmlSetTopLightColor(r, g, b);
-      } else if (mode === 'io4' && io4Connected.value) {
-        await setTopLightColor(r, g, b);
-      }
+      await setColor(r, g, b);
     }, 50);
 
-    const debouncedButtonSend = debounce(async (hex: string) => {
+    const sendButton = debounce(async (hex: string, setColor: (r: number, g: number, b: number) => Promise<void>) => {
       const [r, g, b] = hexToRgb(hex);
-      if (deviceMode.value === 'maimoller' && mmlConnected.value) {
-        await mmlSetAllButtonColor(r, g, b);
-      } else if (ledConnected.value) {
-        await setAllLedColor(r, g, b);
-      }
+      await setColor(r, g, b);
     }, 50);
 
-    const debouncedFrameSend = debounce(async (value: number) => {
-      if (deviceMode.value === 'maimoller' && mmlConnected.value) {
-        await mmlSetFrameBrightness(value);
-      } else if (ledConnected.value) {
-        await setFrameLightBrightness(value);
-      }
+    const sendFrame = debounce(async (value: number, setBrightness: (v: number) => Promise<void>) => {
+      await setBrightness(value);
     }, 50);
 
     watch(topColor, v => {
-      const mode = deviceMode.value;
-      if ((mode === 'io4' && io4Connected.value) || (mode === 'maimoller' && mmlConnected.value)) {
-        debouncedTopSend(v);
-      }
+      const tl = activeDevice.value.lighting.topLight;
+      if (tl.available.value) sendTop(v, tl.setColor);
     });
     watch(buttonColor, v => {
-      if ((deviceMode.value === 'maimoller' && mmlConnected.value) || ledConnected.value) {
-        debouncedButtonSend(v);
-      }
+      const bl = activeDevice.value.lighting.buttonLight;
+      if (bl.available.value) sendButton(v, bl.setColor);
     });
     watch(frameBrightness, v => {
-      if ((deviceMode.value === 'maimoller' && mmlConnected.value) || ledConnected.value) {
-        debouncedFrameSend(v);
-      }
+      const fl = activeDevice.value.lighting.frameLight;
+      if (fl.available.value) sendFrame(v, fl.setBrightness);
     });
 
     const renderPresetColors = (currentColor: typeof topColor) => (
@@ -110,18 +90,18 @@ export default defineComponent({
     );
 
     return () => {
-      const mode = deviceMode.value;
-      const isMml = mode === 'maimoller' && mmlConnected.value;
-      const showTop = (mode === 'io4' && io4Connected.value) || isMml;
-      const showSerial = ledConnected.value || isMml;
+      const { lighting } = activeDevice.value;
+      const showTop = lighting.topLight.supported && lighting.topLight.available.value;
+      const showButton = lighting.buttonLight.supported && lighting.buttonLight.available.value;
+      const showFrame = lighting.frameLight.supported && lighting.frameLight.available.value;
 
-      if (!showTop && !showSerial) return null;
+      if (!showTop && !showButton && !showFrame) return null;
 
       return (
         <div class={styles.container}>
           {showTop && renderColorSection('顶灯', topColor)}
 
-          {showSerial && (
+          {showFrame && (
             <div class={styles.section}>
               <div class={styles.label}>框体灯亮度</div>
               <div class={styles.brightnessRow}>
@@ -134,7 +114,7 @@ export default defineComponent({
             </div>
           )}
 
-          {showSerial && renderColorSection('按键灯', buttonColor)}
+          {showButton && renderColorSection('按键灯', buttonColor)}
         </div>
       );
     };
