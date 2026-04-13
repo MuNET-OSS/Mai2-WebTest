@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import { ledConnected, setAllLedColor } from '@/devices/ledSerial';
-import { Button } from '@munet/ui';
+import { Button, TextInput } from '@munet/ui';
 import styles from './index.module.sass';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -27,12 +27,11 @@ export default defineComponent({
     return () => (
       <div class={styles.container}>
         <div class={styles.label}>LED</div>
-        <input
+        <TextInput
           type="color"
-          value={color.value}
-          onInput={(e: Event) => { color.value = (e.target as HTMLInputElement).value; }}
+          v-model:value={color.value}
           disabled={!ledConnected.value}
-          class={styles.picker}
+          class="w-12 h-8 p-1 cursor-pointer"
         />
         <Button
           onClick={handleSend}

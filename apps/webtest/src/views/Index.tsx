@@ -16,7 +16,7 @@ export default defineComponent({
         <ConnectionPanel />
 
         <div class="flex-1 grid min-[1600px]:cols-2 items-center gap-4">
-          <Section title="Display" defaultOpen={true}>
+          <Section title="Display" expend={true}>
             <div class="relative h-full w-full">
               <Display currentSelected={selectedZones.value} class="h-full w-full"/>
               {io4Connected.value && (
@@ -30,7 +30,7 @@ export default defineComponent({
 
           <div class="flex flex-col gap-4 items-center">
             {io4Connected.value && (
-              <Section title="System Buttons" defaultOpen={true}>
+              <Section title="System Buttons" expend={true}>
                 <div class="flex gap-3 flex-wrap justify-center">
                   {SYSTEM_BUTTONS.map(name => (
                     <div class="flex items-center gap-1.5 px-3 py-1 rounded border border-gray-600 text-sm">
@@ -45,12 +45,12 @@ export default defineComponent({
               </Section>
             )}
 
-            <Section title="LED Control" defaultOpen={true}>
+            <Section title="LED Control" expend={true}>
               <LedControl />
             </Section>
 
             {touchConnected.value && !!lastBuffer.value.length && (
-              <Section title="Touch Raw Data" defaultOpen={true}>
+              <Section title="Touch Raw Data" expend={true}>
                 <div class="flex gap-2 text-sm text-gray-400">
                   <span>Touch raw:</span>
                   <span>(</span>
