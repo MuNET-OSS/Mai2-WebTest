@@ -100,8 +100,22 @@ async function readLoop() {
   }
 }
 
-export const serialConnect = async () => {
-  const port = await navigator.serial.requestPort();
+const TOUCH_STORAGE_KEY = 'autoReconnect.touch';
+
+async function saveTouchPortInfo(port: SerialPort) {
+  const info = port.getInfo();
+  const ports = await navigator.serial.getPorts();
+  const sameDevicePorts = ports.filter(p => {
+    const i = p.getInfo();
+    return i.usbVendorId === info.usbVendorId && i.usbProductId === info.usbProductId;
+  });
+  localStorage.setItem(TOUCH_STORAGE_KEY, JSON.stringify({
+    ...info,
+    sameDeviceIndex: sameDevicePorts.indexOf(port),
+  }));
+}
+
+async function connectToPort(port: SerialPort) {
   await port.open(SERIAL_OPTIONS);
   touchPort.value = port;
   touchConnected.value = true;
@@ -117,10 +131,17 @@ export const serialConnect = async () => {
   await writeString('{HALT}');
   await writeString('{RSET}');
   await writeString('{STAT}');
+}
+
+export const serialConnect = async () => {
+  const port = await navigator.serial.requestPort();
+  await connectToPort(port);
+  await saveTouchPortInfo(port);
 };
 
 export const closeSerial = async () => {
   console.log('closeSerial');
+  localStorage.removeItem(TOUCH_STORAGE_KEY);
   if (!touchConnected.value) return;
   try {
     await writeString('{HALT}');
@@ -165,3 +186,25 @@ const processChunk = () => {
 };
 
 const check = (data: readonly number[], offset: readonly [number, number]) => ((data[offset[0]] >> offset[1]) & 1) != 0;
+
+export async function tryAutoReconnectTouch() {
+  const stored = localStorage.getItem(TOUCH_STORAGE_KEY);
+  if (!stored) return;
+
+  const savedInfo = JSON.parse(stored);
+  const ports = await navigator.serial.getPorts();
+  const sameDevicePorts = ports.filter(p => {
+    const info = p.getInfo();
+    return info.usbVendorId === savedInfo.usbVendorId &&
+      info.usbProductId === savedInfo.usbProductId;
+  });
+  const port = sameDevicePorts[savedInfo.sameDeviceIndex];
+
+  if (port) {
+    try {
+      await connectToPort(port);
+    } catch (e) {
+      console.error('Touch auto-reconnect failed:', e);
+    }
+  }
+}

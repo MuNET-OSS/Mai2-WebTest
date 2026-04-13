@@ -1,5 +1,5 @@
 import { defineComponent, ref } from 'vue';
-import { ledConnected, setAllLedColor } from '@/ledSerial';
+import { ledConnected, setAllLedColor } from '@/devices/ledSerial';
 import styles from './index.module.sass';
 
 function hexToRgb(hex: string): [number, number, number] {

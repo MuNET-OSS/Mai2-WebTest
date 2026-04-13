@@ -115,8 +115,22 @@ async function writePacket(packet: Uint8Array) {
   }
 }
 
-export async function connectLed() {
-  const port = await navigator.serial.requestPort();
+const LED_STORAGE_KEY = 'autoReconnect.led';
+
+async function saveLedPortInfo(port: SerialPort) {
+  const info = port.getInfo();
+  const ports = await navigator.serial.getPorts();
+  const sameDevicePorts = ports.filter(p => {
+    const i = p.getInfo();
+    return i.usbVendorId === info.usbVendorId && i.usbProductId === info.usbProductId;
+  });
+  localStorage.setItem(LED_STORAGE_KEY, JSON.stringify({
+    ...info,
+    sameDeviceIndex: sameDevicePorts.indexOf(port),
+  }));
+}
+
+async function connectToPort(port: SerialPort) {
   await port.open({ baudRate: LED_BAUD_RATE });
   ledPort.value = port;
   ledConnected.value = true;
@@ -129,7 +143,14 @@ export async function connectLed() {
   });
 }
 
+export async function connectLed() {
+  const port = await navigator.serial.requestPort();
+  await connectToPort(port);
+  await saveLedPortInfo(port);
+}
+
 export async function disconnectLed() {
+  localStorage.removeItem(LED_STORAGE_KEY);
   readLoopActive = false;
   try {
     reader?.cancel();
@@ -162,4 +183,26 @@ export async function setAllLedColor(r: number, g: number, b: number) {
 
   const updatePacket = buildPacket(CMD_LED_UPDATE, []);
   await writePacket(updatePacket);
+}
+
+export async function tryAutoReconnectLed() {
+  const stored = localStorage.getItem(LED_STORAGE_KEY);
+  if (!stored) return;
+
+  const savedInfo = JSON.parse(stored);
+  const ports = await navigator.serial.getPorts();
+  const sameDevicePorts = ports.filter(p => {
+    const info = p.getInfo();
+    return info.usbVendorId === savedInfo.usbVendorId &&
+      info.usbProductId === savedInfo.usbProductId;
+  });
+  const port = sameDevicePorts[savedInfo.sameDeviceIndex];
+
+  if (port) {
+    try {
+      await connectToPort(port);
+    } catch (e) {
+      console.error('LED auto-reconnect failed:', e);
+    }
+  }
 }

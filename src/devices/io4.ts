@@ -19,6 +19,8 @@ const ACTIVE_LOW = new Set([
   '2P_BTN1', '2P_BTN2', '2P_BTN3', '2P_BTN4', '2P_BTN5', '2P_BTN6', '2P_BTN7', '2P_BTN8',
 ]);
 
+const IO4_STORAGE_KEY = 'autoReconnect.io4';
+
 export const io4Device = shallowRef<HIDDevice | null>(null);
 export const io4Connected = ref(false);
 export const buttonStates = ref<Record<string, boolean>>({});
@@ -46,14 +48,7 @@ function onInputReport(event: HIDInputReportEvent) {
   parseInputReport(event.data);
 }
 
-export async function connectIO4() {
-  const devices = await navigator.hid.requestDevice({
-    filters: [{ vendorId: IO4_VID, productId: IO4_PID }],
-  });
-
-  if (!devices.length) return;
-  const device = devices[0];
-
+async function connectToDevice(device: HIDDevice) {
   if (!device.opened) {
     await device.open();
   }
@@ -78,7 +73,18 @@ export async function connectIO4() {
   });
 }
 
+export async function connectIO4() {
+  const devices = await navigator.hid.requestDevice({
+    filters: [{ vendorId: IO4_VID, productId: IO4_PID }],
+  });
+
+  if (!devices.length) return;
+  await connectToDevice(devices[0]);
+  localStorage.setItem(IO4_STORAGE_KEY, 'true');
+}
+
 export async function disconnectIO4() {
+  localStorage.removeItem(IO4_STORAGE_KEY);
   if (!io4Device.value) return;
   try {
     io4Device.value.removeEventListener('inputreport', onInputReport as EventListener);
@@ -90,4 +96,22 @@ export async function disconnectIO4() {
   io4Connected.value = false;
   buttonStates.value = {};
   player1Buttons.value = new Array(8).fill(false);
+}
+
+export async function tryAutoReconnectIO4() {
+  const stored = localStorage.getItem(IO4_STORAGE_KEY);
+  if (!stored) return;
+
+  const devices = await navigator.hid.getDevices();
+  const device = devices.find(d =>
+    d.vendorId === IO4_VID && d.productId === IO4_PID,
+  );
+
+  if (device) {
+    try {
+      await connectToDevice(device);
+    } catch (e) {
+      console.error('IO4 auto-reconnect failed:', e);
+    }
+  }
 }

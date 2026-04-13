@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue';
-import { lastBuffer, selectedZones, touchConnected } from '@/serial';
-import { buttonStates, io4Connected, player1Buttons } from '@/io4';
+import { lastBuffer, selectedZones, touchConnected } from '@/devices/touchSerial';
+import { buttonStates, io4Connected, player1Buttons } from '@/devices/io4';
 import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
 import ConnectionPanel from '@/components/ConnectionPanel';
@@ -16,7 +16,7 @@ export default defineComponent({
 
         <div class="flex-1 grid min-[1600px]:cols-2 items-center gap-4">
           <div class="relative h-full w-full">
-            <Display currentSelected={selectedZones.value} class="max-h-90vw max-w-90vh" />
+            <Display currentSelected={selectedZones.value} class="h-full w-full"/>
             {io4Connected.value && (
               <ButtonRing
                 pressed={player1Buttons.value}

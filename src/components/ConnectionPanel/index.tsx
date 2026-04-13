@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue';
-import { touchConnected, serialConnect, closeSerial } from '@/serial';
-import { ledConnected, connectLed, disconnectLed } from '@/ledSerial';
-import { io4Connected, connectIO4, disconnectIO4 } from '@/io4';
+import { touchConnected, serialConnect, closeSerial } from '@/devices/touchSerial';
+import { ledConnected, connectLed, disconnectLed } from '@/devices/ledSerial';
+import { io4Connected, connectIO4, disconnectIO4 } from '@/devices/io4';
 import styles from './index.module.sass';
 
 export default defineComponent({
