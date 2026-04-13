@@ -2,8 +2,7 @@ import { defineComponent, ref } from 'vue';
 import { touchConnected, serialConnect, closeSerial } from '@/devices/touchSerial';
 import { ledConnected, connectLed, disconnectLed } from '@/devices/ledSerial';
 import { io4Connected, connectIO4, disconnectIO4 } from '@/devices/io4';
-import { Button } from '@munet/ui';
-import styles from './index.module.sass';
+import { Button, theme } from '@munet/ui';
 
 export default defineComponent({
   setup() {
@@ -63,10 +62,13 @@ export default defineComponent({
     };
 
     return () => (
-      <div class={styles.panel}>
-        <div class={styles.item}>
+      <div class="flex gap-4 flex-wrap py-2">
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
           <span class={statusDot(touchConnected.value, touchConnecting.value)} />
-          <span class={styles.protocol}>Touch (COM3 / COM4)</span>
+          <div class="flex flex-col mr-2 min-w-24">
+            <span class="font-semibold text-[13px]">Touch</span>
+            <span class="text-[11px] opacity-60">COM3 / COM4</span>
+          </div>
           <Button
             onClick={handleTouchConnect}
             ing={touchConnecting.value}
@@ -77,9 +79,12 @@ export default defineComponent({
           </Button>
         </div>
 
-        <div class={styles.item}>
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
           <span class={statusDot(ledConnected.value, ledConnecting.value)} />
-          <span class={styles.protocol}>LED (COM21 / COM23)</span>
+          <div class="flex flex-col mr-2 min-w-24">
+            <span class="font-semibold text-[13px]">LED</span>
+            <span class="text-[11px] opacity-60">COM21 / COM23</span>
+          </div>
           <Button
             onClick={handleLedConnect}
             ing={ledConnecting.value}
@@ -90,9 +95,12 @@ export default defineComponent({
           </Button>
         </div>
 
-        <div class={styles.item}>
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
           <span class={statusDot(io4Connected.value, io4Connecting.value)} />
-          <span class={styles.protocol}>IO4</span>
+          <div class="flex flex-col mr-2 min-w-24">
+            <span class="font-semibold text-[13px]">IO4</span>
+            <span class="text-[11px] opacity-60">Device</span>
+          </div>
           <Button
             onClick={handleIO4Connect}
             ing={io4Connecting.value}
