@@ -15,7 +15,7 @@ export default defineComponent({
     const showLightSection = io4Connected.value || ledConnected.value;
 
     return (
-      <div class="h-full flex flex-col gap-4 p-4">
+      <div class="h-full flex flex-col gap-4 p-4 max-h-100vh overflow-y-auto cst">
         <ConnectionPanel />
 
         <div class="flex-1 flex flex-col min-[1600px]:grid min-[1600px]:cols-2 gap-4">
