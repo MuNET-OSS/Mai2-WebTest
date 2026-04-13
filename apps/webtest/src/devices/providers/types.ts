@@ -6,7 +6,7 @@ export type SystemButtonName = 'SERVICE' | 'TEST' | '1P_SEL' | '2P_SEL' | 'COIN'
 export interface DeviceConnection {
   key: string;
   label: string;
-  hint: string;
+  hint: string | Ref<string> | ComputedRef<string>;
   connected: Ref<boolean>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;

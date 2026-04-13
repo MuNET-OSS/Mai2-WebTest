@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import type { TestDeviceProvider } from './types';
 import {
   mmlConnected, mmlButtonStates, mmlPlayer1Buttons, mmlSelectedZones,
+  mmlPlayerSide,
   connectMML, disconnectMML, tryAutoReconnectMML,
   mmlSetTopLightColor, mmlSetAllButtonColor, mmlSetFrameBrightness,
 } from '@/devices/maimollerHid';
@@ -39,7 +40,7 @@ export const maimollerProvider: TestDeviceProvider = {
   },
 
   connections: [
-    { key: 'mml', label: 'Maimoller', hint: 'HID Device', connected: mmlConnected, connect: connectMML, disconnect: disconnectMML },
+    { key: 'mml', label: 'Maimoller', hint: computed(() => mmlPlayerSide.value ? `HID Device · ${mmlPlayerSide.value}` : 'HID Device'), connected: mmlConnected, connect: connectMML, disconnect: disconnectMML },
   ],
 
   lifecycle: {

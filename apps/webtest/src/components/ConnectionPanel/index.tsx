@@ -1,4 +1,4 @@
-import { computed, defineComponent, reactive } from 'vue';
+import { computed, defineComponent, reactive, unref } from 'vue';
 import { activeDevice, deviceMode, setDeviceMode, switchingDeviceMode } from '@/devices/deviceMode';
 import type { DeviceMode } from '@/devices/deviceMode';
 import { Button, Select, theme } from '@munet/ui';
@@ -58,7 +58,7 @@ export default defineComponent({
                 <span class={statusDot(conn.connected.value, connecting)} />
                 <div class="flex flex-col mr-2 min-w-24">
                   <span class="font-semibold text-[13px]">{conn.label}</span>
-                  <span class="text-[11px] opacity-60">{conn.hint}</span>
+                  <span class="text-[11px] opacity-60">{unref(conn.hint)}</span>
                 </div>
                 <Button
                   onClick={() => handleConnect(conn.key, conn.connected.value, conn.connect, conn.disconnect)}
