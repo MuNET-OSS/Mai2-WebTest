@@ -35,9 +35,6 @@ importers:
       vue-router:
         specifier: ^4.4.3
         version: 4.4.3(vue@3.4.38(typescript@5.5.4))
-      vue-serial:
-        specifier: ^1.0.2
-        version: 1.0.2
 
 packages:
 
@@ -1213,9 +1210,6 @@ packages:
     resolution: {integrity: sha512-sv6wmNKx2j3aqJQDMxLFzs/u/mjA9Z5LCgy6BE0f7yFWMjrPLnS/sPNn8ARY/FXw6byV18EFutn5lTO6+UsV5A==}
     peerDependencies:
       vue: ^3.2.0
-
-  vue-serial@1.0.2:
-    resolution: {integrity: sha512-GKGLz3qJxFN89HmaQcDEM3QwXaA5zf8JVmzY86/r9hLKfQgiD0Wyx41Na8NQo/YezOnhCMTC7cACcYAKBx1t2Q==}
 
   vue@3.4.38:
     resolution: {integrity: sha512-f0ZgN+mZ5KFgVv9wz0f4OgVKukoXtS3nwET4c2vLBGQR50aI8G0cqbFtLlX9Yiyg3LFGBitruPHt2PxwTduJEw==}
@@ -2423,8 +2417,6 @@ snapshots:
     dependencies:
       '@vue/devtools-api': 6.6.3
       vue: 3.4.38(typescript@5.5.4)
-
-  vue-serial@1.0.2: {}
 
   vue@3.4.38(typescript@5.5.4):
     dependencies:

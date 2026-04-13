@@ -1,5 +1,4 @@
 import { ref, shallowRef } from 'vue';
-import VueSerial from 'vue-serial';
 
 const touch = {
   a1: [0, 0],
@@ -38,58 +37,110 @@ const touch = {
   e8: [6, 3],
 } as const;
 
-export const serial = new VueSerial();
-serial.baudRate = 9600;
-serial.dataBits = 8;
-serial.stopBits = 1;
-serial.parity = 'none';
-serial.bufferSize = 1; // set to 1 to receive byte-per-byte
-serial.flowControl = 'none';
+export const touchPort = shallowRef<SerialPort | null>(null);
+export const touchConnected = ref(false);
 
-const writeString = (data: string) => {
-  return serial.write(data.split('').map(it => it.charCodeAt(0)));
+let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+let readLoopActive = false;
+
+const SERIAL_OPTIONS: SerialOptions = {
+  baudRate: 9600,
+  dataBits: 8,
+  stopBits: 1,
+  parity: 'none',
+  bufferSize: 1,
+  flowControl: 'none',
 };
 
-export const serialConnect = async () => {
-  await serial.connect(undefined);
-  if (serial.isOpen) {
-    console.log('串口已打开');
-    await writeString(`{HALT}`);
-    await writeString(`{RSET}`);
-    await writeString(`{STAT}`);
+async function writeBytes(data: number[]) {
+  if (!touchPort.value?.writable) return;
+  const writer = touchPort.value.writable.getWriter();
+  try {
+    await writer.write(new Uint8Array(data));
+  } finally {
+    writer.releaseLock();
   }
+}
+
+const writeString = (data: string) => {
+  return writeBytes(data.split('').map(it => it.charCodeAt(0)));
+};
+
+let recvBuff: number[] = [];
+
+function processReceivedByte(byte: number) {
+  if (byte === 40) {
+    recvBuff = [];
+  } else if (byte === 41) {
+    processChunk();
+  } else {
+    recvBuff.push(byte);
+  }
+}
+
+async function readLoop() {
+  if (!touchPort.value?.readable) return;
+  readLoopActive = true;
+  try {
+    reader = touchPort.value.readable.getReader();
+    while (readLoopActive) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) {
+        for (const byte of value) {
+          processReceivedByte(byte);
+        }
+      }
+    }
+  } catch (e) {
+    if (readLoopActive) console.error('Touch read error:', e);
+  } finally {
+    reader?.releaseLock();
+    reader = null;
+  }
+}
+
+export const serialConnect = async () => {
+  const port = await navigator.serial.requestPort();
+  await port.open(SERIAL_OPTIONS);
+  touchPort.value = port;
+  touchConnected.value = true;
+  readLoop();
+
+  port.addEventListener('disconnect', () => {
+    touchConnected.value = false;
+    touchPort.value = null;
+    readLoopActive = false;
+  });
+
+  console.log('串口已打开');
+  await writeString('{HALT}');
+  await writeString('{RSET}');
+  await writeString('{STAT}');
 };
 
 export const closeSerial = async () => {
   console.log('closeSerial');
-  if (!serial.isOpen) return;
+  if (!touchConnected.value) return;
   try {
     await writeString('{HALT}');
-  }
-  catch (e) {
+  } catch (e) {
     console.log(e);
   }
-  await serial.close();
-};
-
-
-let recvBuff: number[] = [];
-
-const onReceiveFunction = ({ value }: { value: Uint8Array }) => {
-  for (const byte of value) {
-    if (byte === 40) {
-      recvBuff = [];
-    }
-    else if (byte === 41) {
-      processChunk();
-    }
-    else {
-      recvBuff.push(byte);
+  readLoopActive = false;
+  try {
+    reader?.cancel();
+  } catch (_) {}
+  if (touchPort.value) {
+    try {
+      await touchPort.value.close();
+    } catch (e) {
+      console.error(e);
     }
   }
+  touchPort.value = null;
+  touchConnected.value = false;
 };
-
-serial.addEventListener('read', onReceiveFunction as any);
 
 export const selectedZones = ref<string[]>([]);
 export const lastBuffer = shallowRef<number[]>([]);

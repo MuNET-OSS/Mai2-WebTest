@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { lastBuffer, selectedZones, serial } from '@/serial';
+import { lastBuffer, selectedZones, touchConnected } from '@/serial';
 import { buttonStates, io4Connected, player1Buttons } from '@/io4';
 import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
@@ -42,7 +42,7 @@ export default defineComponent({
 
             <LedControl />
 
-            {serial.isOpen && !!lastBuffer.value.length && (
+            {touchConnected.value && !!lastBuffer.value.length && (
               <div class="flex gap-2 text-sm text-gray-400">
                 <span>Touch raw:</span>
                 <span>(</span>

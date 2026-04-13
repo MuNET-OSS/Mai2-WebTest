@@ -1,5 +1,5 @@
 import { defineComponent, ref } from 'vue';
-import { serial, serialConnect, closeSerial } from '@/serial';
+import { touchConnected, serialConnect, closeSerial } from '@/serial';
 import { ledConnected, connectLed, disconnectLed } from '@/ledSerial';
 import { io4Connected, connectIO4, disconnectIO4 } from '@/io4';
 import styles from './index.module.sass';
@@ -11,7 +11,7 @@ export default defineComponent({
     const io4Connecting = ref(false);
 
     const handleTouchConnect = async () => {
-      if (serial.isOpen) {
+      if (touchConnected.value) {
         await closeSerial();
         return;
       }
@@ -64,14 +64,14 @@ export default defineComponent({
     return () => (
       <div class={styles.panel}>
         <div class={styles.item}>
-          <span class={statusDot(serial.isOpen, touchConnecting.value)} />
+          <span class={statusDot(touchConnected.value, touchConnecting.value)} />
           <span class={styles.protocol}>Touch (COM3 / COM4)</span>
           <button
             class={styles.btn}
             onClick={handleTouchConnect}
             disabled={touchConnecting.value}
           >
-            {touchConnecting.value ? '...' : serial.isOpen ? '断开' : '连接'}
+            {touchConnecting.value ? '...' : touchConnected.value ? '断开' : '连接'}
           </button>
         </div>
 
