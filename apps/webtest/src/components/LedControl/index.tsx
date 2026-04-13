@@ -2,6 +2,8 @@ import { defineComponent, ref, watch } from 'vue';
 import { debounce } from 'perfect-debounce';
 import { ledConnected, setAllLedColor, setFrameLightBrightness } from '@/devices/ledSerial';
 import { io4Connected, setTopLightColor } from '@/devices/io4';
+import { mmlConnected, mmlSetTopLightColor, mmlSetAllButtonColor, mmlSetFrameBrightness } from '@/devices/maimollerHid';
+import { deviceMode } from '@/devices/deviceMode';
 import { Range } from '@munet/ui';
 import styles from './index.module.sass';
 
@@ -34,21 +36,47 @@ export default defineComponent({
 
     const debouncedTopSend = debounce(async (hex: string) => {
       const [r, g, b] = hexToRgb(hex);
-      await setTopLightColor(r, g, b);
+      const mode = deviceMode.value;
+      if (mode === 'maimoller' && mmlConnected.value) {
+        await mmlSetTopLightColor(r, g, b);
+      } else if (mode === 'io4' && io4Connected.value) {
+        await setTopLightColor(r, g, b);
+      }
     }, 50);
 
     const debouncedButtonSend = debounce(async (hex: string) => {
       const [r, g, b] = hexToRgb(hex);
-      await setAllLedColor(r, g, b);
+      if (deviceMode.value === 'maimoller' && mmlConnected.value) {
+        await mmlSetAllButtonColor(r, g, b);
+      } else if (ledConnected.value) {
+        await setAllLedColor(r, g, b);
+      }
     }, 50);
 
     const debouncedFrameSend = debounce(async (value: number) => {
-      await setFrameLightBrightness(value);
+      if (deviceMode.value === 'maimoller' && mmlConnected.value) {
+        await mmlSetFrameBrightness(value);
+      } else if (ledConnected.value) {
+        await setFrameLightBrightness(value);
+      }
     }, 50);
 
-    watch(topColor, v => { if (io4Connected.value) debouncedTopSend(v); });
-    watch(buttonColor, v => { if (ledConnected.value) debouncedButtonSend(v); });
-    watch(frameBrightness, v => { if (ledConnected.value) debouncedFrameSend(v); });
+    watch(topColor, v => {
+      const mode = deviceMode.value;
+      if ((mode === 'io4' && io4Connected.value) || (mode === 'maimoller' && mmlConnected.value)) {
+        debouncedTopSend(v);
+      }
+    });
+    watch(buttonColor, v => {
+      if ((deviceMode.value === 'maimoller' && mmlConnected.value) || ledConnected.value) {
+        debouncedButtonSend(v);
+      }
+    });
+    watch(frameBrightness, v => {
+      if ((deviceMode.value === 'maimoller' && mmlConnected.value) || ledConnected.value) {
+        debouncedFrameSend(v);
+      }
+    });
 
     const renderPresetColors = (currentColor: typeof topColor) => (
       <div class={styles.presets}>
@@ -82,8 +110,10 @@ export default defineComponent({
     );
 
     return () => {
-      const showTop = io4Connected.value;
-      const showSerial = ledConnected.value;
+      const mode = deviceMode.value;
+      const isMml = mode === 'maimoller' && mmlConnected.value;
+      const showTop = (mode === 'io4' && io4Connected.value) || isMml;
+      const showSerial = ledConnected.value || isMml;
 
       if (!showTop && !showSerial) return null;
 
