@@ -9,6 +9,10 @@ importers:
   .: {}
 
   apps/webtest:
+    dependencies:
+      perfect-debounce:
+        specifier: ^2.1.0
+        version: 2.1.0
     devDependencies:
       '@fontsource/noto-sans-sc':
         specifier: ^5.2.9

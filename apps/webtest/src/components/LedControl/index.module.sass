@@ -1,9 +1,46 @@
 .container
   display: flex
-  align-items: center
-  gap: 12px
+  flex-direction: column
+  gap: 16px
+
+.section
+  display: flex
+  flex-direction: column
+  gap: 8px
 
 .label
   font-size: 14px
   font-weight: 600
-  min-width: 30px
+
+.colorRow
+  display: flex
+  align-items: center
+  gap: 10px
+
+.brightnessRow
+  display: flex
+  align-items: center
+  gap: 10px
+
+.brightnessValue
+  font-size: 13px
+  min-width: 2.5em
+  text-align: right
+  font-variant-numeric: tabular-nums
+
+.presets
+  display: flex
+  gap: 4px
+  flex-wrap: wrap
+
+.presetSwatch
+  width: 24px
+  height: 24px
+  border-radius: 2333px
+  cursor: pointer
+
+  &:hover
+    transform: scale(1.15)
+
+.presetSwatchActive
+  border-color: oklch(70% 0.15 var(--hue))

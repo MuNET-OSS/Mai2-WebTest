@@ -6,6 +6,7 @@ const DST_NODE_ID = 0x11;
 const SRC_NODE_ID = 0x01;
 
 const CMD_SET_LED_MULTI = 0x32;
+const CMD_SET_LED_FET = 0x39;
 const CMD_LED_UPDATE = 0x3C;
 
 const LED_BAUD_RATE = 115200;
@@ -177,12 +178,22 @@ export async function setAllLedColor(r: number, g: number, b: number) {
   b = Math.max(0, Math.min(255, Math.floor(b)));
 
   const setColorPacket = buildPacket(CMD_SET_LED_MULTI, [0x00, 0x20, 0x00, r, g, b, 0x00]);
+  console.log('setColorPacket', setColorPacket);
   await writePacket(setColorPacket);
 
   await new Promise(resolve => setTimeout(resolve, 10));
 
   const updatePacket = buildPacket(CMD_LED_UPDATE, []);
   await writePacket(updatePacket);
+}
+
+export async function setFrameLightBrightness(value: number) {
+  if (!ledPort.value || !ledConnected.value) return;
+
+  value = Math.max(0, Math.min(255, Math.floor(value)));
+
+  const packet = buildPacket(CMD_SET_LED_FET, [value, 0x00, 0x00]);
+  await writePacket(packet);
 }
 
 export async function tryAutoReconnectLed() {

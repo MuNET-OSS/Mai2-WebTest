@@ -99,7 +99,7 @@ export default defineComponent({
           <span class={statusDot(io4Connected.value, io4Connecting.value)} />
           <div class="flex flex-col mr-2 min-w-24">
             <span class="font-semibold text-[13px]">IO4</span>
-            <span class="text-[11px] opacity-60">Device</span>
+            <span class="text-[11px] opacity-60">HID Device</span>
           </div>
           <Button
             onClick={handleIO4Connect}

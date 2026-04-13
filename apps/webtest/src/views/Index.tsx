@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue';
-import { lastBuffer, selectedZones, touchConnected } from '@/devices/touchSerial';
+import { selectedZones } from '@/devices/touchSerial';
 import { buttonStates, io4Connected, player1Buttons } from '@/devices/io4';
+import { ledConnected } from '@/devices/ledSerial';
 import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
 import ConnectionPanel from '@/components/ConnectionPanel';
@@ -11,6 +12,8 @@ const SYSTEM_BUTTONS = ['SERVICE', 'TEST', '1P_SEL', '2P_SEL'] as const;
 
 export default defineComponent({
   render() {
+    const showLightSection = io4Connected.value || ledConnected.value;
+
     return (
       <div class="h-full flex flex-col gap-4 p-4">
         <ConnectionPanel />
@@ -47,9 +50,11 @@ export default defineComponent({
               </Section>
             )}
 
-            <Section title="LED 控制" expend={true}>
-              <LedControl />
-            </Section>
+            {showLightSection && (
+              <Section title="灯光控制" expend={true}>
+                <LedControl />
+              </Section>
+            )}
           </div>
         </div>
       </div>
