@@ -19,33 +19,3 @@
   font-size: 11px
   opacity: 0.7
   min-width: 80px
-
-$dot-size: 8px
-
-.dotConnected
-  width: $dot-size
-  height: $dot-size
-  border-radius: 50%
-  background: #4caf50
-  flex-shrink: 0
-
-.dotDisconnected
-  width: $dot-size
-  height: $dot-size
-  border-radius: 50%
-  background: currentColor
-  opacity: 0.5
-  flex-shrink: 0
-
-.dotConnecting
-  width: $dot-size
-  height: $dot-size
-  border-radius: 50%
-  background: #ffc107
-  flex-shrink: 0
-  animation: pulse 1s infinite
-  @keyframes pulse
-    0%, 100%
-      opacity: 1
-    50%
-      opacity: 0.3

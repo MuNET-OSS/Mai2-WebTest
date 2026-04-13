@@ -57,9 +57,9 @@ export default defineComponent({
     };
 
     const statusDot = (connected: boolean, connecting: boolean) => {
-      if (connecting) return styles.dotConnecting;
-      if (connected) return styles.dotConnected;
-      return styles.dotDisconnected;
+      if (connecting) return "w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0 animate-pulse";
+      if (connected) return "w-2 h-2 rounded-full bg-green-500 flex-shrink-0";
+      return "w-2 h-2 rounded-full bg-current opacity-50 flex-shrink-0";
     };
 
     return () => (

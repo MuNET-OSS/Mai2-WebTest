@@ -33,10 +33,12 @@ export default defineComponent({
               <Section title="System Buttons" expend={true}>
                 <div class="flex gap-3 flex-wrap justify-center">
                   {SYSTEM_BUTTONS.map(name => (
-                    <div class="flex items-center gap-1.5 px-3 py-1 rounded border border-gray-600 text-sm">
+                    <div class="flex items-center gap-1.5 px-3 py-1 rounded border border-gray-500/50 text-sm">
                       <span
-                        class="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: buttonStates.value[name] ? '#4caf50' : '#666' }}
+                        class={[
+                          "w-2 h-2 rounded-full flex-shrink-0",
+                          buttonStates.value[name] ? 'bg-green-500' : 'bg-gray-500'
+                        ]}
                       />
                       {name}
                     </div>
