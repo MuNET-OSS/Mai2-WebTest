@@ -48,6 +48,15 @@ function onInputReport(event: HIDInputReportEvent) {
   parseInputReport(event.data);
 }
 
+function onHidDisconnect(e: HIDConnectionEvent) {
+  if (e.device === io4Device.value) {
+    io4Device.value = null;
+    io4Connected.value = false;
+    buttonStates.value = {};
+    player1Buttons.value = new Array(8).fill(false);
+  }
+}
+
 async function connectToDevice(device: HIDDevice) {
   if (!device.opened) {
     await device.open();
@@ -63,14 +72,8 @@ async function connectToDevice(device: HIDDevice) {
   io4Device.value = device;
   io4Connected.value = true;
 
-  navigator.hid.addEventListener('disconnect', (e: HIDConnectionEvent) => {
-    if (e.device === io4Device.value) {
-      io4Device.value = null;
-      io4Connected.value = false;
-      buttonStates.value = {};
-      player1Buttons.value = new Array(8).fill(false);
-    }
-  });
+  navigator.hid.removeEventListener('disconnect', onHidDisconnect as EventListener);
+  navigator.hid.addEventListener('disconnect', onHidDisconnect as EventListener);
 }
 
 export async function connectIO4() {
