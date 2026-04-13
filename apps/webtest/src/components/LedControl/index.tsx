@@ -1,5 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import { ledConnected, setAllLedColor } from '@/devices/ledSerial';
+import { Button } from '@munet/ui';
 import styles from './index.module.sass';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -33,13 +34,13 @@ export default defineComponent({
           disabled={!ledConnected.value}
           class={styles.picker}
         />
-        <button
+        <Button
           onClick={handleSend}
+          ing={sending.value}
           disabled={!ledConnected.value || sending.value}
-          class={styles.sendBtn}
         >
-          {sending.value ? '...' : '发送'}
-        </button>
+          发送
+        </Button>
       </div>
     );
   },

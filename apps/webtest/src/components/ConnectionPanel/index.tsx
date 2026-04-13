@@ -2,6 +2,7 @@ import { defineComponent, ref } from 'vue';
 import { touchConnected, serialConnect, closeSerial } from '@/devices/touchSerial';
 import { ledConnected, connectLed, disconnectLed } from '@/devices/ledSerial';
 import { io4Connected, connectIO4, disconnectIO4 } from '@/devices/io4';
+import { Button } from '@munet/ui';
 import styles from './index.module.sass';
 
 export default defineComponent({
@@ -66,37 +67,40 @@ export default defineComponent({
         <div class={styles.item}>
           <span class={statusDot(touchConnected.value, touchConnecting.value)} />
           <span class={styles.protocol}>Touch (COM3 / COM4)</span>
-          <button
-            class={styles.btn}
+          <Button
             onClick={handleTouchConnect}
+            ing={touchConnecting.value}
             disabled={touchConnecting.value}
+            size="small"
           >
-            {touchConnecting.value ? '...' : touchConnected.value ? '断开' : '连接'}
-          </button>
+            {touchConnected.value ? '断开' : '连接'}
+          </Button>
         </div>
 
         <div class={styles.item}>
           <span class={statusDot(ledConnected.value, ledConnecting.value)} />
           <span class={styles.protocol}>LED (COM21 / COM23)</span>
-          <button
-            class={styles.btn}
+          <Button
             onClick={handleLedConnect}
+            ing={ledConnecting.value}
             disabled={ledConnecting.value}
+            size="small"
           >
-            {ledConnecting.value ? '...' : ledConnected.value ? '断开' : '连接'}
-          </button>
+            {ledConnected.value ? '断开' : '连接'}
+          </Button>
         </div>
 
         <div class={styles.item}>
           <span class={statusDot(io4Connected.value, io4Connecting.value)} />
           <span class={styles.protocol}>IO4</span>
-          <button
-            class={styles.btn}
+          <Button
             onClick={handleIO4Connect}
+            ing={io4Connecting.value}
             disabled={io4Connecting.value}
+            size="small"
           >
-            {io4Connecting.value ? '...' : io4Connected.value ? '断开' : '连接'}
-          </button>
+            {io4Connected.value ? '断开' : '连接'}
+          </Button>
         </div>
       </div>
     );
