@@ -63,7 +63,7 @@ export default defineComponent({
 
     return () => (
       <div class="flex gap-4 flex-wrap py-2">
-        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl ', theme.value.listItem]}>
           <span class={statusDot(touchConnected.value, touchConnecting.value)} />
           <div class="flex flex-col mr-2 min-w-24">
             <span class="font-semibold text-[13px]">Touch</span>
@@ -79,7 +79,7 @@ export default defineComponent({
           </Button>
         </div>
 
-        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl ', theme.value.listItem]}>
           <span class={statusDot(ledConnected.value, ledConnecting.value)} />
           <div class="flex flex-col mr-2 min-w-24">
             <span class="font-semibold text-[13px]">LED</span>
@@ -95,7 +95,7 @@ export default defineComponent({
           </Button>
         </div>
 
-        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl shadow-sm border border-black/5 dark:border-white/10', theme.value.listItem]}>
+        <div class={['flex items-center gap-3 px-4 py-3 rounded-xl ', theme.value.listItem]}>
           <span class={statusDot(io4Connected.value, io4Connecting.value)} />
           <div class="flex flex-col mr-2 min-w-24">
             <span class="font-semibold text-[13px]">IO4</span>

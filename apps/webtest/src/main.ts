@@ -8,7 +8,7 @@ import App from './App';
 import router from '@/router';
 import { initThemeDefaults, selectedThemeName, UIThemes } from '@munet/ui';
 
-initThemeDefaults({ hue: 210 });
+initThemeDefaults({ hue: 220 });
 selectedThemeName.value = UIThemes.DynamicLight;
 
 createApp(App)

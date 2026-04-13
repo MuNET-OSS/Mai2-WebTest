@@ -5,7 +5,7 @@ import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
 import ConnectionPanel from '@/components/ConnectionPanel';
 import LedControl from '@/components/LedControl';
-import { Section } from '@munet/ui';
+import { Section, theme } from '@munet/ui';
 
 const SYSTEM_BUTTONS = ['SERVICE', 'TEST', '1P_SEL', '2P_SEL'] as const;
 
@@ -33,7 +33,7 @@ export default defineComponent({
               <Section title="系统按键" expend={true}>
                 <div class="flex gap-3 flex-wrap justify-center">
                   {SYSTEM_BUTTONS.map(name => (
-                    <div class="flex items-center gap-1.5 px-3 py-1 rounded border border-gray-500/50 text-sm">
+                    <div class={["flex items-center gap-1.5 px-3 py-1.5 rounded text-sm", buttonStates.value[name] ? theme.value.listItemAlt : theme.value.listItem]}>
                       <span
                         class={[
                           "w-2 h-2 rounded-full flex-shrink-0",
