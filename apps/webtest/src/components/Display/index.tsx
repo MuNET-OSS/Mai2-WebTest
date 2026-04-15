@@ -3,9 +3,51 @@ import styles from './index.module.sass';
 
 const CLASS_NOT_SELECTED = styles.region;
 const CLASS_SELECTED = `${styles.region} ${styles.selected}`;
+
+// Counter text positions (from Noron reference — valueText coordinates for each zone)
+const COUNTER_POSITIONS: Record<string, { x: number; y: number }> = {
+  e8: { x: 84.722466, y: 95.169083 },
+  e7: { x: 60.821415, y: 153.68095 },
+  e6: { x: 84.722534, y: 210.88676 },
+  e5: { x: 142.4507, y: 235.70206 },
+  e4: { x: 200.04832, y: 210.88676 },
+  e3: { x: 224.27589, y: 153.68095 },
+  e2: { x: 200.04832, y: 95.169083 },
+  e1: { x: 142.4507, y: 71.137421 },
+  d8: { x: 58.364643, y: 66.696785 },
+  d7: { x: 17.041054, y: 155.24825 },
+  d6: { x: 51.834305, y: 241.18755 },
+  d5: { x: 142.42686, y: 278.54111 },
+  d4: { x: 232.33299, y: 241.18755 },
+  d3: { x: 264.7262, y: 155.24825 },
+  d2: { x: 227.63113, y: 66.696785 },
+  d1: { x: 142.42686, y: 34.828709 },
+  c2: { x: 128.35144, y: 153.41974 },
+  c1: { x: 156, y: 153.41974 },
+  b8: { x: 121.05595, y: 101.43822 },
+  b7: { x: 88.926659, y: 132.78386 },
+  b6: { x: 88.926659, y: 179.80232 },
+  b5: { x: 121.05595, y: 210.36433 },
+  b4: { x: 164.41742, y: 210.36433 },
+  b3: { x: 194.97943, y: 180.06354 },
+  b2: { x: 194.97943, y: 132.78386 },
+  b1: { x: 164.41742, y: 101.43822 },
+  a8: { x: 99.401733, y: 49.456676 },
+  a7: { x: 34.622692, y: 113.85674 },
+  a6: { x: 34.622692, y: 200.5797 },
+  a5: { x: 99.401733, y: 264.43558 },
+  a4: { x: 183.7634, y: 264.43558 },
+  a3: { x: 248.84404, y: 200.5797 },
+  a2: { x: 248.84404, y: 113.85674 },
+  a1: { x: 183.7634, y: 49.456676 },
+};
+
+const COUNTER_TEXT_STYLE = 'font-size:9px;text-align:center;text-anchor:middle;white-space:pre;pointer-events:none';
+
 export default defineComponent({
   props: {
     currentSelected: Array as PropType<string[]>,
+    counters: Object as PropType<Record<string, number>>,
   },
   setup(props, { emit }) {
     const currentSelected = computed(() => props.currentSelected || [])
@@ -730,7 +772,23 @@ export default defineComponent({
           </text>
         </g>
       </g>
-    </svg>
-      ;
+      {props.counters && (
+        <g style="pointer-events:none">
+          {Object.entries(COUNTER_POSITIONS).map(([zone, pos]) => {
+            const count = props.counters![zone];
+            return count > 0 ? (
+              <text
+                style={COUNTER_TEXT_STYLE}
+                x={pos.x}
+                y={pos.y}
+                fill="#555555"
+              >
+                {count}
+              </text>
+            ) : null;
+          })}
+        </g>
+      )}
+    </svg>;
   },
 });

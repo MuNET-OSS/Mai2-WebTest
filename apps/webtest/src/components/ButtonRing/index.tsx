@@ -1,4 +1,4 @@
-import { computed, defineComponent, PropType } from 'vue';
+import { defineComponent, PropType } from 'vue';
 import styles from './index.module.sass';
 
 const PATHS = [
@@ -12,9 +12,23 @@ const PATHS = [
   'M 122.06697,1.5575277 A 142.875,142.875 0 0 0 58.334424,28.142985 l 5.103564,6.805269 a 134.00911,134.00911 0 0 1 59.849062,-24.64294 z',
 ];
 
+const BUTTON_COUNTER_POSITIONS = [
+  { x: 196, y: 18 },
+  { x: 270, y: 93 },
+  { x: 269, y: 197 },
+  { x: 195, y: 270 },
+  { x: 91, y: 270 },
+  { x: 17, y: 197 },
+  { x: 16, y: 93 },
+  { x: 90, y: 18 },
+];
+
+const COUNTER_TEXT_STYLE = 'font-size:5px;text-align:center;text-anchor:middle;white-space:pre';
+
 export default defineComponent({
   props: {
     pressed: { type: Array as PropType<boolean[]>, required: true },
+    counters: { type: Array as PropType<number[]> },
   },
   setup(props) {
     return () => (
@@ -29,6 +43,26 @@ export default defineComponent({
             d={PATHS[index]}
           />
         ))}
+        {props.counters && (
+          <g>
+            {BUTTON_COUNTER_POSITIONS.map((pos, i) => {
+              const count = props.counters![i];
+              return count > 0 ? (
+                <g>
+                  <circle cx={pos.x} cy={pos.y - 1.5} r={6} fill="oklch(0.81 0.09 var(--hue) / 0.5)" />
+                  <text
+                    style={COUNTER_TEXT_STYLE}
+                    x={pos.x}
+                    y={pos.y}
+                    fill="#606266"
+                  >
+                    {count}
+                  </text>
+                </g>
+              ) : null;
+            })}
+          </g>
+        )}
       </svg>
     );
   },
