@@ -3,6 +3,7 @@ import { useStorage } from '@vueuse/core';
 import { io4Provider } from './providers/io4Provider';
 import { adxProvider } from './providers/adxProvider';
 import { maimollerProvider } from './providers/maimollerProvider';
+import { pdxProvider } from './providers/pdxProvider';
 import type { DeviceMode, TestDeviceProvider } from './providers/types';
 
 export type { DeviceMode, TestDeviceProvider } from './providers/types';
@@ -14,6 +15,7 @@ const providers: Record<DeviceMode, TestDeviceProvider> = {
   io4: io4Provider,
   adx: adxProvider,
   maimoller: maimollerProvider,
+  pdx: pdxProvider,
 };
 
 export const activeDevice = computed(() => providers[deviceMode.value]);
@@ -25,14 +27,7 @@ async function transitionDeviceMode(from: DeviceMode, to: DeviceMode) {
     await providers[from].lifecycle.disconnectExclusiveConnections();
     return;
   }
-  if (to === 'maimoller') {
-    await providers[from].lifecycle.disconnectPresentedConnections();
-    return;
-  }
-  if (from === 'maimoller') {
-    await providers[from].lifecycle.disconnectExclusiveConnections();
-    return;
-  }
+  await providers[from].lifecycle.disconnectPresentedConnections();
 }
 
 async function tryRestoreModeConnections(from: DeviceMode, to: DeviceMode) {
@@ -40,14 +35,7 @@ async function tryRestoreModeConnections(from: DeviceMode, to: DeviceMode) {
     await providers[to].lifecycle.tryAutoReconnectExclusiveConnections();
     return;
   }
-  if (from === 'maimoller' && isSerialMode(to)) {
-    await providers[to].lifecycle.tryAutoReconnectPresentedConnections();
-    return;
-  }
-  if (isSerialMode(from) && to === 'maimoller') {
-    await providers[to].lifecycle.tryAutoReconnectExclusiveConnections();
-    return;
-  }
+  await providers[to].lifecycle.tryAutoReconnectPresentedConnections();
 }
 
 export async function setDeviceMode(nextMode: DeviceMode) {

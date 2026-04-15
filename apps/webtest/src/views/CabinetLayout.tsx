@@ -1,10 +1,11 @@
 import { defineComponent, onMounted, onUnmounted } from 'vue';
-import { activeDevice } from '@/devices/deviceMode';
+import { activeDevice, deviceMode } from '@/devices/deviceMode';
 import { touchCounters, buttonCounters, resetCounters } from '@/pressCounter';
 import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
 import ConnectionPanel from '@/components/ConnectionPanel';
 import LedControl from '@/components/LedControl';
+import PdxSettings from '@/components/PdxSettings';
 import { theme } from '@munet/ui';
 
 export default defineComponent({
@@ -24,6 +25,7 @@ export default defineComponent({
     const device = activeDevice.value;
     const hidConnected = device.buttons.connected.value;
     const showLightSection = device.lighting.available.value;
+    const showPdxSettings = deviceMode.value === 'pdx';
 
     return (
       <div class="relative h-100vh w-100vw overflow-hidden">
@@ -51,6 +53,8 @@ export default defineComponent({
             )}
 
             {showLightSection && <LedControl />}
+
+            {showPdxSettings && <PdxSettings />}
 
           </div>
         </div>

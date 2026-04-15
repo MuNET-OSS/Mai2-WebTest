@@ -26,9 +26,15 @@ importers:
       '@munet/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@types/w3c-web-hid':
+        specifier: ^1.0.7
+        version: 1.0.7
       '@types/w3c-web-serial':
         specifier: ^1.0.8
         version: 1.0.8
+      '@types/w3c-web-usb':
+        specifier: ^1.0.14
+        version: 1.0.14
       '@unocss/reset':
         specifier: ^66.6.8
         version: 66.6.8
@@ -918,8 +924,14 @@ packages:
   '@types/lodash@4.17.24':
     resolution: {integrity: sha512-gIW7lQLZbue7lRSWEFql49QJJWThrTFFeIMJdp3eH4tKoxm1OvEPg02rm4wCCSHS0cL3/Fizimb35b7k8atwsQ==}
 
+  '@types/w3c-web-hid@1.0.7':
+    resolution: {integrity: sha512-/y97wBH7fYB5vKoDIn11O1ZDMNFLCAVqZ9af0OWDN7VSO2ClErEN2HlGbBuPgHBTUmZOVx1og2ZHX1U2gEJM4Q==}
+
   '@types/w3c-web-serial@1.0.8':
     resolution: {integrity: sha512-QQOT+bxQJhRGXoZDZGLs3ksLud1dMNnMiSQtBA0w8KXvLpXX4oM4TZb6J0GgJ8UbCaHo5s9/4VQT8uXy9JER2A==}
+
+  '@types/w3c-web-usb@1.0.14':
+    resolution: {integrity: sha512-Qu3Nn6JFuF4+sHKYl+IcX9vYiI40ogleXzFFSxoE1W94rG98o/kXs8uJ0QSfFzuwBCZWlGfUGpPkgwuuX4PchA==}
 
   '@types/web-bluetooth@0.0.21':
     resolution: {integrity: sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==}
@@ -2323,7 +2335,11 @@ snapshots:
 
   '@types/lodash@4.17.24': {}
 
+  '@types/w3c-web-hid@1.0.7': {}
+
   '@types/w3c-web-serial@1.0.8': {}
+
+  '@types/w3c-web-usb@1.0.14': {}
 
   '@types/web-bluetooth@0.0.21': {}
 

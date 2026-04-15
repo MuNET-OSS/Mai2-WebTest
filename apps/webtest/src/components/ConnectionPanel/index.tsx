@@ -8,6 +8,7 @@ const MODE_OPTIONS: SelectOption[] = [
   { label: 'Onii-mai / IO4', value: 'io4' },
   { label: 'ADX / NDX HID', value: 'adx' },
   { label: 'Maimoller', value: 'maimoller' },
+  { label: 'PDX（独占）', value: 'pdx' },
 ];
 
 export default defineComponent({

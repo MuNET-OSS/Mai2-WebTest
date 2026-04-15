@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue';
 
-export type DeviceMode = 'io4' | 'adx' | 'maimoller';
+export type DeviceMode = 'io4' | 'adx' | 'maimoller' | 'pdx';
 export type SystemButtonName = 'SERVICE' | 'TEST' | '1P_SEL' | '2P_SEL' | 'COIN' | 'SELECT';
 
 export interface DeviceConnection {

@@ -1,10 +1,11 @@
 import { defineComponent } from 'vue';
-import { activeDevice } from '@/devices/deviceMode';
+import { activeDevice, deviceMode } from '@/devices/deviceMode';
 import { touchCounters, buttonCounters, resetCounters } from '@/pressCounter';
 import Display from '@/components/Display';
 import ButtonRing from '@/components/ButtonRing';
 import ConnectionPanel from '@/components/ConnectionPanel';
 import LedControl from '@/components/LedControl';
+import PdxSettings from '@/components/PdxSettings';
 import { Section, theme } from '@munet/ui';
 
 export default defineComponent({
@@ -12,6 +13,7 @@ export default defineComponent({
     const device = activeDevice.value;
     const hidConnected = device.buttons.connected.value;
     const showLightSection = device.lighting.available.value;
+    const showPdxSettings = deviceMode.value === 'pdx';
 
     return (
       <div class="h-full flex flex-col gap-4 p-4 max-h-100vh overflow-y-auto cst">
@@ -59,6 +61,12 @@ export default defineComponent({
             {showLightSection && (
               <Section title="灯光控制" expend={true}>
                 <LedControl />
+              </Section>
+            )}
+
+            {showPdxSettings && (
+              <Section title="PDX 触摸半径" expend={true}>
+                <PdxSettings />
               </Section>
             )}
           </div>
