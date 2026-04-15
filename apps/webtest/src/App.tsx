@@ -35,7 +35,7 @@ export default defineComponent({
       <UIGlobalElementsContainer />
       <RouterView />
       <button
-        class="absolute top-2 right-2 rounded-full p-0 w-8 h-8 flex items-center justify-center"
+        class="absolute top-8px right-8px rounded-full p-0 w-32px h-32px flex items-center justify-center text-16px"
         onClick={toggleFullscreen}
         title={isFullscreen.value ? '退出全屏' : '全屏'}
       >

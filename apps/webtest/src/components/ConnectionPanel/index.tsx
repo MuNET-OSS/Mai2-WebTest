@@ -57,8 +57,8 @@ export default defineComponent({
               <div key={conn.key} class={['flex items-center gap-3 px-4 py-3 rounded-xl', theme.value.listItem]}>
                 <span class={statusDot(conn.connected.value, connecting)} />
                 <div class="flex flex-col mr-2 min-w-24">
-                  <span class="font-semibold text-[13px]">{conn.label}</span>
-                  <span class="text-[11px] opacity-60">{unref(conn.hint)}</span>
+                  <span class="font-semibold text-3.25">{conn.label}</span>
+                  <span class="text-2.75 opacity-60">{unref(conn.hint)}</span>
                 </div>
                 <Button
                   onClick={() => handleConnect(conn.key, conn.connected.value, conn.connect, conn.disconnect)}
