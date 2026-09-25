@@ -6,6 +6,7 @@ import type { SelectOption } from '@munet/ui';
 
 const MODE_OPTIONS: SelectOption[] = [
   { label: 'Onii-mai / HDX / IO4', value: 'io4' },
+  { label: 'NPro WinUSB', value: 'npro' },
   { label: 'ADX / NDX HID', value: 'adx' },
   { label: 'Maimoller', value: 'maimoller' },
   // { label: 'PDX（独占）', value: 'pdx' },

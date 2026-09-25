@@ -1,13 +1,12 @@
 import { ref, shallowRef } from 'vue';
-
-const SYNC = 0xE0;
-const ESCAPE = 0xD0;
-const DST_NODE_ID = 0x11;
-const SRC_NODE_ID = 0x01;
-
-const CMD_SET_LED_MULTI = 0x32;
-const CMD_SET_LED_FET = 0x39;
-const CMD_LED_UPDATE = 0x3C;
+import {
+  buildLedFrameBrightnessPacket,
+  buildLedSetAllButtonPacket,
+  buildLedUpdatePacket,
+  calculateLedChecksum,
+  LED_ESCAPE,
+  LED_SYNC,
+} from './ledProtocol';
 
 const LED_BAUD_RATE = 115200;
 
@@ -18,48 +17,19 @@ export const ledLastAck = shallowRef<number[]>([]);
 let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 let readLoopActive = false;
 
-function calculateChecksum(data: number[]): number {
-  let sum = 0;
-  for (const byte of data) {
-    sum = (sum + byte) & 0xFF;
-  }
-  return sum;
-}
-
-function escapeBytes(data: number[]): number[] {
-  const result: number[] = [];
-  for (const byte of data) {
-    if (byte === SYNC || byte === ESCAPE) {
-      result.push(ESCAPE, byte - 1);
-    } else {
-      result.push(byte);
-    }
-  }
-  return result;
-}
-
-function buildPacket(command: number, payload: number[]): Uint8Array {
-  const length = 1 + payload.length;
-  const rawBody = [DST_NODE_ID, SRC_NODE_ID, length, command, ...payload];
-  const checksum = calculateChecksum(rawBody);
-  const escapedBody = escapeBytes(rawBody);
-  const escapedChecksum = escapeBytes([checksum]);
-  return new Uint8Array([SYNC, ...escapedBody, ...escapedChecksum]);
-}
-
 let recvBuf: number[] = [];
 let recvEscape = false;
 let recvSynced = false;
 
 function processReceivedByte(byte: number) {
-  if (byte === SYNC) {
+  if (byte === LED_SYNC) {
     recvBuf = [];
     recvEscape = false;
     recvSynced = true;
     return;
   }
   if (!recvSynced) return;
-  if (byte === ESCAPE) {
+  if (byte === LED_ESCAPE) {
     recvEscape = true;
     return;
   }
@@ -74,7 +44,7 @@ function processReceivedByte(byte: number) {
     if (recvBuf.length === expectedLen + 1) {
       const bodyForChecksum = recvBuf.slice(0, expectedLen);
       const receivedChecksum = recvBuf[expectedLen];
-      const calculatedChecksum = calculateChecksum(bodyForChecksum);
+      const calculatedChecksum = calculateLedChecksum(bodyForChecksum);
       if (receivedChecksum === calculatedChecksum) {
         ledLastAck.value = [...recvBuf];
       }
@@ -173,26 +143,20 @@ export async function disconnectLed() {
 export async function setAllLedColor(r: number, g: number, b: number) {
   if (!ledPort.value || !ledConnected.value) return;
 
-  r = Math.max(0, Math.min(255, Math.floor(r)));
-  g = Math.max(0, Math.min(255, Math.floor(g)));
-  b = Math.max(0, Math.min(255, Math.floor(b)));
-
-  const setColorPacket = buildPacket(CMD_SET_LED_MULTI, [0x00, 0x20, 0x00, r, g, b, 0x00]);
+  const setColorPacket = buildLedSetAllButtonPacket(r, g, b);
   console.log('setColorPacket', setColorPacket);
   await writePacket(setColorPacket);
 
   await new Promise(resolve => setTimeout(resolve, 10));
 
-  const updatePacket = buildPacket(CMD_LED_UPDATE, []);
+  const updatePacket = buildLedUpdatePacket();
   await writePacket(updatePacket);
 }
 
 export async function setFrameLightBrightness(value: number) {
   if (!ledPort.value || !ledConnected.value) return;
 
-  value = Math.max(0, Math.min(255, Math.floor(value)));
-
-  const packet = buildPacket(CMD_SET_LED_FET, [value, 0x00, 0x00]);
+  const packet = buildLedFrameBrightnessPacket(value);
   await writePacket(packet);
 }
 

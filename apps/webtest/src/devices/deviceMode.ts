@@ -4,6 +4,7 @@ import { io4Provider } from './providers/io4Provider';
 import { adxProvider } from './providers/adxProvider';
 import { maimollerProvider } from './providers/maimollerProvider';
 import { pdxProvider } from './providers/pdxProvider';
+import { nproProvider } from './providers/nproProvider';
 import type { DeviceMode, TestDeviceProvider } from './providers/types';
 
 export type { DeviceMode, TestDeviceProvider } from './providers/types';
@@ -16,6 +17,7 @@ const providers: Record<DeviceMode, TestDeviceProvider> = {
   adx: adxProvider,
   maimoller: maimollerProvider,
   pdx: pdxProvider,
+  npro: nproProvider,
 };
 
 export const activeDevice = computed(() => providers[deviceMode.value]);

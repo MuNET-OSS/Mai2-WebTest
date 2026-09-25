@@ -14,7 +14,7 @@ export default defineComponent({
 
     onMounted(() => {
       savedFontSize = document.documentElement.style.fontSize;
-      document.documentElement.style.fontSize = '1.5vw';
+      document.documentElement.style.fontSize = 'max(12px, 1.5vw)';
     });
 
     onUnmounted(() => {

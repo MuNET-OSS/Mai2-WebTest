@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Browser-based diagnostic tool for maimai DX cabinet hardware. Supports 3 device modes (IO4, ADX/NDX, Maimoller) via `TestDeviceProvider` abstraction. Uses Web Serial and WebHID APIs.
+Browser-based diagnostic tool for maimai DX cabinet hardware. Supports IO4, ADX/NDX, Maimoller, PDX and NPro WinUSB modes via `TestDeviceProvider` abstraction. Uses Web Serial, WebHID and WebUSB APIs.
 
 ## WHERE TO LOOK
 
@@ -23,11 +23,13 @@ Browser-based diagnostic tool for maimai DX cabinet hardware. Supports 3 device 
 Components consume `activeDevice` (computed from `deviceMode`), never raw drivers.
 
 ```
-deviceMode.ts          → selects active provider (io4 | adx | maimoller)
+deviceMode.ts          → selects active provider (io4 | adx | maimoller | pdx | npro)
 providers/types.ts     → TestDeviceProvider interface
 providers/io4Provider   → touch(Serial) + LED(Serial) + IO4(HID)
 providers/adxProvider   → touch(Serial) + LED(Serial) + ADX(HID)
 providers/maimollerProv → single Maimoller HID device handles all
+providers/pdxProvider    → PDX touch(WebUSB) + LED(Serial) + IO4(HID)
+providers/nproProvider   → single NPro GAME WinUSB device handles all
 ```
 
 **Connection categories**:
@@ -39,7 +41,7 @@ Mode transitions disconnect exclusive (and sometimes presented) connections, the
 ## CONVENTIONS (DIFFERENT FROM PARENT)
 
 - All device drivers export Vue reactive refs (`touchConnected`, `adxConnected`, etc.) at module scope
-- Auto-reconnect stored in `localStorage` keys: `autoReconnect.touch`, `autoReconnect.led`, `autoReconnect.io4`, `autoReconnect.adx`, `autoReconnect.maimoller`
+- Auto-reconnect stored in `localStorage` keys: `autoReconnect.touch`, `autoReconnect.led`, `autoReconnect.io4`, `autoReconnect.adx`, `autoReconnect.maimoller`, `autoReconnect.pdx`, `autoReconnect.npro`
 - Device mode persisted via `useStorage('deviceMode', 'io4')`
 - Device port matching: `usbVendorId` + `usbProductId` + `sameDeviceIndex` for serial; `vendorId`/`productId` for HID
 - Components use `activeDevice.value.touch.zones`, `activeDevice.value.buttons.states`, etc. — never import driver refs directly
@@ -53,6 +55,7 @@ Mode transitions disconnect exclusive (and sometimes presented) connections, the
 | IO4 | WebHID | VID 0x0CA3 | Input report, uint32 LE at offset 28, active-low |
 | ADX/NDX | WebHID | VID 0x2E3C | Input report, per-byte digital (0/1), 14+ bytes |
 | Maimoller | WebHID | VID 0x0E8F PID 0x1224 | Input 7 bytes (touch bitmask + buttons); Output 63 bytes (LED colors + brightness) |
+| NPro WinUSB | WebUSB | VID 0x2E3C PID 0x5751/0x5752 | GAME interface 0, bulk EP 1, input 8 bytes; SEGA LED protocol output |
 
 ## ANTI-PATTERNS
 
