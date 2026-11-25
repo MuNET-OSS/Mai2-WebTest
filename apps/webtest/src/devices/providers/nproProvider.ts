@@ -11,6 +11,7 @@ import {
   tryAutoReconnectNpro,
   nproSetAllButtonColor,
   nproSetFrameBrightness,
+  nproSetTopColor,
 } from '@/devices/nproUsb';
 
 export const nproProvider: TestDeviceProvider = {
@@ -29,9 +30,11 @@ export const nproProvider: TestDeviceProvider = {
   lighting: {
     available: computed(() => nproConnected.value),
     topLight: {
-      supported: false,
-      available: computed(() => false),
-      async setColor() {},
+      supported: true,
+      available: computed(() => nproConnected.value),
+      async setColor(r, g, b) {
+        if (nproConnected.value) await nproSetTopColor(r, g, b);
+      },
     },
     buttonLight: {
       supported: true,

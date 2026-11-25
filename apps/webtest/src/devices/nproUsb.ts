@@ -1,7 +1,12 @@
 import { ref, shallowRef } from 'vue';
-import { buildLedFrameBrightnessPacket, buildLedSetAllButtonPacket, buildLedUpdatePacket } from './ledProtocol';
+import {
+  buildLedFrameBrightnessPacket,
+  buildLedSetAllButtonPacket,
+  buildLedTopColorPacket,
+  buildLedUpdatePacket,
+} from './ledProtocol';
 
-// NPro 自定义固件：GAME 接口同时承载输入与 SEGA LED 协议。
+// NPro 自定义固件：GAME 接口同时承载输入与 SEGA LED 协议（含扩展 0x3A 顶灯 RGB）。
 // interface 0: 0x01 OUT / 0x81 IN，上行固定 8 字节。
 // report: touch[6] little-endian bitmap + buttons + ext_buttons。
 
@@ -232,4 +237,8 @@ export async function nproSetAllButtonColor(r: number, g: number, b: number) {
 
 export async function nproSetFrameBrightness(value: number) {
   await writePacket(buildLedFrameBrightnessPacket(value));
+}
+
+export async function nproSetTopColor(r: number, g: number, b: number) {
+  await writePacket(buildLedTopColorPacket(r, g, b));
 }

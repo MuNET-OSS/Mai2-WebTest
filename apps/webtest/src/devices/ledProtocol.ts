@@ -5,6 +5,7 @@ const SRC_NODE_ID = 0x01;
 
 const CMD_SET_LED_MULTI = 0x32;
 const CMD_SET_LED_FET = 0x39;
+const CMD_SET_LED_TOP = 0x3A;
 const CMD_LED_UPDATE = 0x3C;
 
 export function calculateLedChecksum(data: readonly number[]): number {
@@ -46,6 +47,10 @@ export function buildLedSetAllButtonPacket(r: number, g: number, b: number): Uin
 
 export function buildLedFrameBrightnessPacket(value: number): Uint8Array<ArrayBuffer> {
   return buildPacket(CMD_SET_LED_FET, [clampByte(value), 0x00, 0x00]);
+}
+
+export function buildLedTopColorPacket(r: number, g: number, b: number): Uint8Array<ArrayBuffer> {
+  return buildPacket(CMD_SET_LED_TOP, [clampByte(r), clampByte(g), clampByte(b)]);
 }
 
 export function buildLedUpdatePacket(): Uint8Array<ArrayBuffer> {
