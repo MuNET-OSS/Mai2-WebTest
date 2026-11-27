@@ -234,7 +234,6 @@ export default defineComponent({
             {isDesktopMode.value && (
               <div class="flex items-center gap-2">
                 <Button
-                  size="small"
                   ing={discovering.value}
                   disabled={anyBusy.value || discovering.value}
                   onClick={() => { void refreshDiscovery(); }}
@@ -243,7 +242,6 @@ export default defineComponent({
                 </Button>
                 {isSerialMode.value && (
                   <Button
-                    size="small"
                     ing={probingSerial.value}
                     disabled={anyBusy.value || probingSerial.value}
                     onClick={() => { void probeAvailableSerialPorts(); }}
@@ -280,7 +278,7 @@ export default defineComponent({
                   disabled={anyBusy.value}
                   onClick={() => { void applyRecommendedSetup(setup); }}
                 >
-                  {setup.reason}{setup.playerSide ? ` (${setup.playerSide})` : ''} · 一键连接
+                  {setup.reason}{setup.playerSide ? ` (${setup.playerSide})` : ''}
                 </Button>
               ))}
             </div>
