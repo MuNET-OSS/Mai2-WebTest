@@ -1,4 +1,5 @@
 import { ref, shallowRef } from 'vue';
+import { getTransport, type HidChannel } from './transport';
 
 // ADX / NDX HID - button input only (replaces IO4)
 // VID 0x2E3C: 1P PIDs 0x5750, 0x5767; 2P via VID 0x2E4C PID 0x5750 or VID 0x2E3C PID 0x5768
@@ -28,10 +29,20 @@ const AUX_BIT_MAP: Record<number, string> = {
 
 const ADX_STORAGE_KEY = 'autoReconnect.adx';
 
-export const adxDevice = shallowRef<HIDDevice | null>(null);
+export const adxChannel = shallowRef<HidChannel | null>(null);
 export const adxConnected = ref(false);
 export const adxButtonStates = ref<Record<string, boolean>>({});
 export const adxPlayer1Buttons = ref<boolean[]>(new Array(8).fill(false));
+
+let unsubInput: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
+
+function cleanupSubscriptions() {
+  unsubInput?.();
+  unsubInput = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
 function parseInputReport(data: DataView) {
   if (data.byteLength < 14) return;
@@ -57,77 +68,84 @@ function parseInputReport(data: DataView) {
   adxPlayer1Buttons.value = p1Buttons;
 }
 
-function onInputReport(event: HIDInputReportEvent) {
-  parseInputReport(event.data);
-}
-
-function onHidDisconnect(e: HIDConnectionEvent) {
-  if (e.device === adxDevice.value) {
-    adxDevice.value = null;
-    adxConnected.value = false;
-    adxButtonStates.value = {};
-    adxPlayer1Buttons.value = new Array(8).fill(false);
-  }
-}
-
-async function connectToDevice(device: HIDDevice) {
+async function connectToDevice(device: HidChannel) {
   if (!device.opened) {
     await device.open();
   }
 
-  device.removeEventListener('inputreport', onInputReport);
-  device.addEventListener('inputreport', onInputReport);
-
-  adxDevice.value = device;
+  cleanupSubscriptions();
+  adxChannel.value = device;
   adxConnected.value = true;
 
-  navigator.hid.removeEventListener('disconnect', onHidDisconnect as EventListener);
-  navigator.hid.addEventListener('disconnect', onHidDisconnect as EventListener);
+  unsubInput = device.onInputReport((_reportId, data) => {
+    parseInputReport(data);
+  });
+  unsubDisconnect = device.onDisconnect(() => {
+    cleanupSubscriptions();
+    adxChannel.value = null;
+    adxConnected.value = false;
+    adxButtonStates.value = {};
+    adxPlayer1Buttons.value = new Array(8).fill(false);
+  });
 }
 
-function isAdxDevice(d: HIDDevice): boolean {
+function isAdxDevice(d: HidChannel): boolean {
   if (d.vendorId === ADX_VID && ADX_PIDS_1P.includes(d.productId)) return true;
   if (d.vendorId === ADX_VID_2P && d.productId === ADX_PID_2P) return true;
   if (d.vendorId === ADX_VID && d.productId === ADX_PID_2P_ALT) return true;
   return false;
 }
 
-export async function connectADX() {
-  const devices = await navigator.hid.requestDevice({
-    filters: [
+export async function connectADX(deviceId?: string) {
+  const transport = getTransport();
+  let device: HidChannel | undefined;
+
+  if (deviceId && transport.openHidDeviceById) {
+    device = await transport.openHidDeviceById(deviceId);
+  } else {
+    const devices = await transport.requestHidDevices([
       { vendorId: ADX_VID, productId: ADX_PIDS_1P[0] },
       { vendorId: ADX_VID, productId: ADX_PIDS_1P[1] },
       { vendorId: ADX_VID_2P, productId: ADX_PID_2P },
       { vendorId: ADX_VID, productId: ADX_PID_2P_ALT },
-    ],
-  });
+    ]);
+    device = devices[0];
+  }
 
-  const device = devices[0];
   if (!device) return;
   await connectToDevice(device);
-  localStorage.setItem(ADX_STORAGE_KEY, 'true');
+  if (transport.kind === 'web') {
+    localStorage.setItem(ADX_STORAGE_KEY, 'true');
+  }
 }
 
 export async function disconnectADX() {
-  localStorage.removeItem(ADX_STORAGE_KEY);
-  if (!adxDevice.value) return;
-  try {
-    adxDevice.value.removeEventListener('inputreport', onInputReport as EventListener);
-    await adxDevice.value.close();
-  } catch (e) {
-    console.error(e);
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(ADX_STORAGE_KEY);
   }
-  adxDevice.value = null;
+  cleanupSubscriptions();
+  if (adxChannel.value) {
+    try {
+      await adxChannel.value.close();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  adxChannel.value = null;
   adxConnected.value = false;
   adxButtonStates.value = {};
   adxPlayer1Buttons.value = new Array(8).fill(false);
 }
 
 export async function tryAutoReconnectADX() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(ADX_STORAGE_KEY);
   if (!stored) return;
 
-  const devices = await navigator.hid.getDevices();
+  const devices = await transport.getAuthorizedHidDevices();
   const device = devices.find(isAdxDevice);
 
   if (device) {

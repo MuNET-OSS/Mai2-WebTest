@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import type { TestDeviceProvider } from './types';
-import { selectedZones, touchConnected, serialConnect, closeSerial, tryAutoReconnectTouch } from '@/devices/touchSerial';
-import { ledConnected, connectLed, disconnectLed, setAllLedColor, setFrameLightBrightness, tryAutoReconnectLed } from '@/devices/ledSerial';
+import { selectedZones, touchConnected, touchPortLabel, serialConnect, closeSerial, tryAutoReconnectTouch } from '@/devices/touchSerial';
+import { ledConnected, ledPortLabel, connectLed, disconnectLed, setAllLedColor, setFrameLightBrightness, tryAutoReconnectLed } from '@/devices/ledSerial';
 import { adxConnected, adxButtonStates, adxPlayer1Buttons, connectADX, disconnectADX, tryAutoReconnectADX } from '@/devices/adxHid';
 
 export const adxProvider: TestDeviceProvider = {
@@ -37,9 +37,36 @@ export const adxProvider: TestDeviceProvider = {
   },
 
   connections: [
-    { key: 'touch', label: 'Touch', hint: 'COM3 / COM4', connected: touchConnected, connect: serialConnect, disconnect: closeSerial },
-    { key: 'led', label: 'LED', hint: 'COM21 / COM23', connected: ledConnected, connect: connectLed, disconnect: disconnectLed },
-    { key: 'adx', label: 'ADX / NDX', hint: 'HID Device', connected: adxConnected, connect: connectADX, disconnect: disconnectADX },
+    {
+      key: 'touch',
+      kind: 'serial-touch',
+      label: 'Touch',
+      hint: computed(() => touchPortLabel.value || 'COM3 / COM4'),
+      connected: touchConnected,
+      connect: () => serialConnect(),
+      connectById: (id, opts) => serialConnect(id, opts?.baudRate),
+      disconnect: closeSerial,
+    },
+    {
+      key: 'led',
+      kind: 'serial-led',
+      label: 'LED',
+      hint: computed(() => ledPortLabel.value || 'COM21 / COM23'),
+      connected: ledConnected,
+      connect: () => connectLed(),
+      connectById: id => connectLed(id),
+      disconnect: disconnectLed,
+    },
+    {
+      key: 'adx',
+      kind: 'hid-adx',
+      label: 'ADX / NDX',
+      hint: 'HID Device',
+      connected: adxConnected,
+      connect: () => connectADX(),
+      connectById: id => connectADX(id),
+      disconnect: disconnectADX,
+    },
   ],
 
   lifecycle: {

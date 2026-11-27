@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import { RouterView } from 'vue-router';
-import { tryAutoReconnectActiveDevice } from '@/devices/deviceMode';
+import { initDesktopApp } from '@/devices/desktopDiscovery';
 import { modalShowing, GlobalElementsContainer as UIGlobalElementsContainer } from '@munet/ui';
 import styles from './App.module.sass';
 
@@ -21,7 +21,7 @@ function onFullscreenChange() {
 export default defineComponent({
   setup() {
     onMounted(() => {
-      tryAutoReconnectActiveDevice();
+      void initDesktopApp();
       document.addEventListener('fullscreenchange', onFullscreenChange);
     });
 

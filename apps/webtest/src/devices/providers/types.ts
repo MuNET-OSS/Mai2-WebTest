@@ -2,13 +2,23 @@ import type { ComputedRef, Ref } from 'vue';
 
 export type DeviceMode = 'io4' | 'adx' | 'maimoller' | 'pdx' | 'npro';
 export type SystemButtonName = 'SERVICE' | 'TEST' | '1P_SEL' | '2P_SEL' | 'COIN' | 'SELECT';
+export type DeviceConnectionKind =
+  | 'serial-touch'
+  | 'serial-led'
+  | 'hid-io4'
+  | 'hid-adx'
+  | 'hid-maimoller'
+  | 'usb-pdx'
+  | 'usb-npro';
 
 export interface DeviceConnection {
   key: string;
+  kind: DeviceConnectionKind;
   label: string;
   hint: string | Ref<string> | ComputedRef<string>;
   connected: Ref<boolean>;
   connect(): Promise<void>;
+  connectById(id: string, options?: { baudRate?: number }): Promise<void>;
   disconnect(): Promise<void>;
 }
 

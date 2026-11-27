@@ -40,7 +40,16 @@ export const maimollerProvider: TestDeviceProvider = {
   },
 
   connections: [
-    { key: 'mml', label: 'Maimoller', hint: computed(() => mmlPlayerSide.value ? `HID Device · ${mmlPlayerSide.value}` : 'HID Device'), connected: mmlConnected, connect: connectMML, disconnect: disconnectMML },
+    {
+      key: 'mml',
+      kind: 'hid-maimoller',
+      label: 'Maimoller',
+      hint: computed(() => mmlPlayerSide.value ? `HID Device · ${mmlPlayerSide.value}` : 'HID Device'),
+      connected: mmlConnected,
+      connect: () => connectMML(),
+      connectById: id => connectMML(id),
+      disconnect: disconnectMML,
+    },
   ],
 
   lifecycle: {

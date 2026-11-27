@@ -1,8 +1,9 @@
 import { ref, shallowRef } from 'vue';
 import { useStorage } from '@vueuse/core';
 import { mapTouchPoint, type TouchSensorMapperConfig } from './touchSensorMapper';
+import { getTransport, type UsbChannel } from './transport';
 
-// PDX Touch — WinUSB multitouch digitizer (accessed via WebUSB)
+// PDX Touch — WinUSB multitouch digitizer (accessed via WebUSB / Desktop WinUSB Bridge)
 // VID 0x3356, PID 0x3003, configuration 1, interface 1, endpoint 2
 // Packet (64 bytes): byte[0] = reportId (expect 2)
 //   Then 10 touch slots × 6 bytes each starting at byte 1
@@ -51,13 +52,21 @@ interface FingerState {
 
 const fingers: FingerState[] = Array.from({ length: 256 }, () => ({ active: false, zones: [] }));
 
-export const pdxDevice = shallowRef<USBDevice | null>(null);
+export const pdxChannel = shallowRef<UsbChannel | null>(null);
 export const pdxConnected = ref(false);
 export const pdxSelectedZones = ref<string[]>([]);
 
 let pendingZones: string[] | undefined;
 let rafScheduled = false;
-let readLoopActive = false;
+let unsubData: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
+
+function cleanupSubscriptions() {
+  unsubData?.();
+  unsubData = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
 function computeActiveZones(): string[] {
   const allZones = new Set<string>();
@@ -121,79 +130,77 @@ function resetFingers() {
   }
 }
 
-async function readLoop(device: USBDevice) {
-  readLoopActive = true;
-  try {
-    while (readLoopActive && pdxDevice.value === device) {
-      const result = await device.transferIn(PDX_ENDPOINT, PDX_PACKET_SIZE);
-      if (result.status === 'ok' && result.data && result.data.byteLength > 0) {
-        parsePacket(result.data);
-      }
-    }
-  } catch (e) {
-    if (readLoopActive) {
-      console.error('[PDX] read error:', e);
-    }
-  } finally {
-    readLoopActive = false;
-  }
-}
+async function connectToDevice(device: UsbChannel) {
+  const interfaceNumber = device.interfaceNumber ?? PDX_INTERFACE;
+  const inEndpoint = interfaceNumber === 0 ? 0x81 : 0x80 | PDX_ENDPOINT;
 
-function onUsbDisconnect(e: USBConnectionEvent) {
-  if (e.device === pdxDevice.value) {
-    readLoopActive = false;
-    pdxDevice.value = null;
+  await device.open({
+    configuration: PDX_CONFIGURATION,
+    interfaceNumber,
+    inEndpoint,
+    inPacketSize: PDX_PACKET_SIZE,
+  });
+
+  cleanupSubscriptions();
+  resetFingers();
+
+  pdxChannel.value = device;
+  pdxConnected.value = true;
+
+  unsubData = device.onData(chunk => {
+    const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    parsePacket(view);
+  });
+  unsubDisconnect = device.onDisconnect(() => {
+    cleanupSubscriptions();
+    pdxChannel.value = null;
     pdxConnected.value = false;
     pdxSelectedZones.value = [];
     resetFingers();
-  }
-}
-
-async function connectToDevice(device: USBDevice) {
-  await device.open();
-  await device.selectConfiguration(PDX_CONFIGURATION);
-  await device.claimInterface(PDX_INTERFACE);
-  resetFingers();
-
-  pdxDevice.value = device;
-  pdxConnected.value = true;
-
-  navigator.usb.removeEventListener('disconnect', onUsbDisconnect);
-  navigator.usb.addEventListener('disconnect', onUsbDisconnect);
-
-  readLoop(device);
-}
-
-export async function connectPDX() {
-  const device = await navigator.usb.requestDevice({
-    filters: [{ vendorId: PDX_VID, productId: PDX_PID }],
   });
+}
+
+export async function connectPDX(deviceId?: string) {
+  const transport = getTransport();
+  const device = deviceId && transport.openUsbDeviceById
+    ? await transport.openUsbDeviceById(deviceId)
+    : await transport.requestUsbDevice([
+      { vendorId: PDX_VID, productId: PDX_PID },
+    ]);
 
   await connectToDevice(device);
-  localStorage.setItem(PDX_STORAGE_KEY, 'true');
+  if (transport.kind === 'web') {
+    localStorage.setItem(PDX_STORAGE_KEY, 'true');
+  }
 }
 
 export async function disconnectPDX() {
-  localStorage.removeItem(PDX_STORAGE_KEY);
-  readLoopActive = false;
-  if (!pdxDevice.value) return;
-  try {
-    await pdxDevice.value.releaseInterface(PDX_INTERFACE);
-    await pdxDevice.value.close();
-  } catch (e) {
-    console.error('[PDX] disconnect error:', e);
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(PDX_STORAGE_KEY);
   }
-  pdxDevice.value = null;
+  cleanupSubscriptions();
+  if (pdxChannel.value) {
+    try {
+      await pdxChannel.value.close();
+    } catch (e) {
+      console.error('[PDX] disconnect error:', e);
+    }
+  }
+  pdxChannel.value = null;
   pdxConnected.value = false;
   pdxSelectedZones.value = [];
   resetFingers();
 }
 
 export async function tryAutoReconnectPDX() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(PDX_STORAGE_KEY);
   if (!stored) return;
 
-  const devices = await navigator.usb.getDevices();
+  const devices = await transport.getAuthorizedUsbDevices();
   const device = devices.find(d => d.vendorId === PDX_VID && d.productId === PDX_PID);
   if (!device) return;
 

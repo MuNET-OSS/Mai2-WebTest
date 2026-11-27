@@ -1,4 +1,5 @@
 import { ref, shallowRef } from 'vue';
+import { getTransport, type HidChannel } from './transport';
 
 const IO4_VID = 0x0CA3;
 const CMD_SET_SWITCH_SAMPLING = 0x02;
@@ -22,10 +23,20 @@ const ACTIVE_LOW = new Set([
 
 const IO4_STORAGE_KEY = 'autoReconnect.io4';
 
-export const io4Device = shallowRef<HIDDevice | null>(null);
+export const io4Channel = shallowRef<HidChannel | null>(null);
 export const io4Connected = ref(false);
 export const buttonStates = ref<Record<string, boolean>>({});
 export const player1Buttons = ref<boolean[]>(new Array(8).fill(false));
+
+let unsubInput: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
+
+function cleanupSubscriptions() {
+  unsubInput?.();
+  unsubInput = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
 function parseInputReport(data: DataView) {
   if (data.byteLength < BUTTONS_OFFSET + 4) return;
@@ -45,32 +56,25 @@ function parseInputReport(data: DataView) {
   player1Buttons.value = btnOrder.map(name => states[name] ?? false);
 }
 
-function onInputReport(event: HIDInputReportEvent) {
-  parseInputReport(event.data);
-}
-
-function onHidDisconnect(e: HIDConnectionEvent) {
-  if (e.device === io4Device.value) {
-    io4Device.value = null;
-    io4Connected.value = false;
-    buttonStates.value = {};
-    player1Buttons.value = new Array(8).fill(false);
-  }
-}
-
-async function connectToDevice(device: HIDDevice) {
+async function connectToDevice(device: HidChannel) {
   if (!device.opened) {
     await device.open();
   }
 
-  device.removeEventListener('inputreport', onInputReport);
-  device.addEventListener('inputreport', onInputReport);
-
-  io4Device.value = device;
+  cleanupSubscriptions();
+  io4Channel.value = device;
   io4Connected.value = true;
 
-  navigator.hid.removeEventListener('disconnect', onHidDisconnect as EventListener);
-  navigator.hid.addEventListener('disconnect', onHidDisconnect as EventListener);
+  unsubInput = device.onInputReport((_reportId, data) => {
+    parseInputReport(data);
+  });
+  unsubDisconnect = device.onDisconnect(() => {
+    cleanupSubscriptions();
+    io4Channel.value = null;
+    io4Connected.value = false;
+    buttonStates.value = {};
+    player1Buttons.value = new Array(8).fill(false);
+  });
 
   try {
     const reportData = new Uint8Array(REPORT_SIZE);
@@ -81,45 +85,58 @@ async function connectToDevice(device: HIDDevice) {
   }
 }
 
-function isJoystickDevice(d: HIDDevice) {
+function isJoystickDevice(d: HidChannel) {
   return d.collections.some(c => c.usagePage === 0x01 && c.usage === 0x04);
 }
 
-export async function connectIO4() {
-  const devices = await navigator.hid.requestDevice({
-    filters: [{ vendorId: IO4_VID, usagePage: 0x01, usage: 0x04 }],
-  });
+export async function connectIO4(deviceId?: string) {
+  const transport = getTransport();
+  let device: HidChannel | undefined;
 
-  const device = devices.find(isJoystickDevice) ?? devices[0];
+  if (deviceId && transport.openHidDeviceById) {
+    device = await transport.openHidDeviceById(deviceId);
+  } else {
+    const devices = await transport.requestHidDevices([
+      { vendorId: IO4_VID, usagePage: 0x01, usage: 0x04 },
+    ]);
+    device = devices.find(isJoystickDevice) ?? devices[0];
+  }
+
   if (!device) return;
   await connectToDevice(device);
-  localStorage.setItem(IO4_STORAGE_KEY, 'true');
+  if (transport.kind === 'web') {
+    localStorage.setItem(IO4_STORAGE_KEY, 'true');
+  }
 }
 
 export async function disconnectIO4() {
-  localStorage.removeItem(IO4_STORAGE_KEY);
-  if (!io4Device.value) return;
-  try {
-    io4Device.value.removeEventListener('inputreport', onInputReport as EventListener);
-    await io4Device.value.close();
-  } catch (e) {
-    console.error(e);
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(IO4_STORAGE_KEY);
   }
-  io4Device.value = null;
+  cleanupSubscriptions();
+  if (io4Channel.value) {
+    try {
+      await io4Channel.value.close();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  io4Channel.value = null;
   io4Connected.value = false;
   buttonStates.value = {};
   player1Buttons.value = new Array(8).fill(false);
 }
 
 export async function tryAutoReconnectIO4() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(IO4_STORAGE_KEY);
   if (!stored) return;
 
-  const devices = await navigator.hid.getDevices();
-  const device = devices.find(d =>
-    d.vendorId === IO4_VID &&
-    d.collections.some(c => c.usagePage === 0x01 && c.usage === 0x04),
-  );
+  const devices = await transport.getAuthorizedHidDevices();
+  const device = devices.find(d => d.vendorId === IO4_VID && isJoystickDevice(d));
 
   if (device) {
     try {
@@ -131,7 +148,7 @@ export async function tryAutoReconnectIO4() {
 }
 
 export async function setTopLightColor(r: number, g: number, b: number) {
-  if (!io4Device.value || !io4Connected.value) return;
+  if (!io4Channel.value || !io4Connected.value) return;
 
   r = Math.max(0, Math.min(255, Math.floor(r)));
   g = Math.max(0, Math.min(255, Math.floor(g)));
@@ -149,6 +166,5 @@ export async function setTopLightColor(r: number, g: number, b: number) {
   reportData[7] = b;
   reportData[8] = b;
 
-  const reportId = OUTPUT_REPORT_ID;
-  await io4Device.value.sendReport(reportId, reportData);
+  await io4Channel.value.sendReport(OUTPUT_REPORT_ID, reportData);
 }

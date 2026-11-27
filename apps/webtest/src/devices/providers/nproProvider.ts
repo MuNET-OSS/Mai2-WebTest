@@ -55,10 +55,12 @@ export const nproProvider: TestDeviceProvider = {
   connections: [
     {
       key: 'npro',
+      kind: 'usb-npro',
       label: 'NPro GAME',
       hint: computed(() => nproPlayerSide.value ? `WinUSB GAME · ${nproPlayerSide.value}` : 'WinUSB GAME'),
       connected: nproConnected,
-      connect: connectNpro,
+      connect: () => connectNpro(),
+      connectById: id => connectNpro(id),
       disconnect: disconnectNpro,
     },
   ],

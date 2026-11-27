@@ -1,9 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import Index from '@/views/Index';
 
 export default createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes: [
     { path: '/', component: Index },
+    { path: '/:pathMatch(.*)*', component: Index },
   ],
 });

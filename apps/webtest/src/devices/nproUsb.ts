@@ -5,6 +5,7 @@ import {
   buildLedTopColorPacket,
   buildLedUpdatePacket,
 } from './ledProtocol';
+import { getTransport, type UsbChannel } from './transport';
 
 // NPro 自定义固件：GAME 接口同时承载输入与 SEGA LED 协议（含扩展 0x3A 顶灯 RGB）。
 // interface 0: 0x01 OUT / 0x81 IN，上行固定 8 字节。
@@ -31,18 +32,26 @@ const TOUCH_ZONE_NAMES = [
 
 const EXT_BUTTON_NAMES = ['1P_SEL', 'SERVICE', '2P_SEL', 'TEST'] as const;
 
-export const nproDevice = shallowRef<USBDevice | null>(null);
+export const nproChannel = shallowRef<UsbChannel | null>(null);
 export const nproConnected = ref(false);
 export const nproPlayerSide = ref<'1P' | '2P' | null>(null);
 export const nproSelectedZones = ref<string[]>([]);
 export const nproButtonStates = ref<Record<string, boolean>>({});
 export const nproPlayer1Buttons = ref<boolean[]>(new Array(8).fill(false));
 
-let readLoopActive = false;
 let pendingInput = new Uint8Array(0);
 let keepAliveTimer: number | undefined;
+let unsubData: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
 
-function isNproDevice(device: USBDevice): boolean {
+function cleanupSubscriptions() {
+  unsubData?.();
+  unsubData = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
+
+function isNproDevice(device: UsbChannel): boolean {
   return device.vendorId === NPRO_VID
     && (device.productId === NPRO_1P_PID || device.productId === NPRO_2P_PID);
 }
@@ -106,109 +115,97 @@ function stopKeepAlive() {
   }
 }
 
-function markDisconnected(device: USBDevice) {
-  if (nproDevice.value !== device) return;
-  readLoopActive = false;
+function markDisconnected(device: UsbChannel) {
+  if (nproChannel.value !== device) return;
+  cleanupSubscriptions();
   stopKeepAlive();
-  nproDevice.value = null;
+  nproChannel.value = null;
   nproConnected.value = false;
   nproPlayerSide.value = null;
   pendingInput = new Uint8Array(0);
   resetState();
 }
 
-function onUsbDisconnect(event: USBConnectionEvent) {
-  markDisconnected(event.device);
-}
-
 async function writePacket(packet: Uint8Array<ArrayBuffer>) {
-  const device = nproDevice.value;
+  const device = nproChannel.value;
   if (!device || !nproConnected.value) return;
 
   try {
-    const result = await device.transferOut(NPRO_GAME_ENDPOINT, packet);
-    if (result.status !== 'ok') {
-      markDisconnected(device);
-    }
+    await device.write(packet);
   } catch (error) {
     console.error('[NPro] write error:', error);
     markDisconnected(device);
   }
 }
 
-function startKeepAlive(device: USBDevice) {
+function startKeepAlive(device: UsbChannel) {
   stopKeepAlive();
   keepAliveTimer = window.setInterval(() => {
-    if (nproDevice.value === device) {
+    if (nproChannel.value === device) {
       void writePacket(buildLedUpdatePacket());
     }
   }, KEEP_ALIVE_INTERVAL_MS);
 }
 
-async function readLoop(device: USBDevice) {
-  readLoopActive = true;
-  try {
-    while (readLoopActive && nproDevice.value === device) {
-      const result = await device.transferIn(NPRO_GAME_ENDPOINT, NPRO_TRANSFER_SIZE);
-      if (result.status !== 'ok' || !result.data) continue;
+async function connectToDevice(device: UsbChannel) {
+  await device.open({
+    configuration: NPRO_CONFIGURATION,
+    interfaceNumber: NPRO_GAME_INTERFACE,
+    inEndpoint: 0x80 | NPRO_GAME_ENDPOINT,
+    outEndpoint: NPRO_GAME_ENDPOINT,
+    inPacketSize: NPRO_TRANSFER_SIZE,
+  });
 
-      appendInputData(new Uint8Array(result.data.buffer, result.data.byteOffset, result.data.byteLength));
-    }
-  } catch (error) {
-    if (readLoopActive) {
-      console.error('[NPro] read error:', error);
-    }
-  } finally {
-    markDisconnected(device);
-  }
-}
-
-async function connectToDevice(device: USBDevice) {
-  await device.open();
-  await device.selectConfiguration(NPRO_CONFIGURATION);
-  await device.claimInterface(NPRO_GAME_INTERFACE);
-
+  cleanupSubscriptions();
   pendingInput = new Uint8Array(0);
   resetState();
-  nproDevice.value = device;
+  nproChannel.value = device;
   nproConnected.value = true;
   nproPlayerSide.value = playerSideForPid(device.productId);
 
-  navigator.usb.removeEventListener('disconnect', onUsbDisconnect);
-  navigator.usb.addEventListener('disconnect', onUsbDisconnect);
-
-  startKeepAlive(device);
-  void readLoop(device);
-}
-
-export async function connectNpro() {
-  const device = await navigator.usb.requestDevice({
-    filters: [
-      { vendorId: NPRO_VID, productId: NPRO_1P_PID },
-      { vendorId: NPRO_VID, productId: NPRO_2P_PID },
-    ],
+  unsubData = device.onData(chunk => {
+    appendInputData(chunk);
+  });
+  unsubDisconnect = device.onDisconnect(() => {
+    markDisconnected(device);
   });
 
+  startKeepAlive(device);
+}
+
+export async function connectNpro(deviceId?: string) {
+  const transport = getTransport();
+  const device = deviceId && transport.openUsbDeviceById
+    ? await transport.openUsbDeviceById(deviceId)
+    : await transport.requestUsbDevice([
+      { vendorId: NPRO_VID, productId: NPRO_1P_PID },
+      { vendorId: NPRO_VID, productId: NPRO_2P_PID },
+    ]);
+
   await connectToDevice(device);
-  localStorage.setItem(NPRO_STORAGE_KEY, 'true');
+  if (transport.kind === 'web') {
+    localStorage.setItem(NPRO_STORAGE_KEY, 'true');
+  }
 }
 
 export async function disconnectNpro() {
-  localStorage.removeItem(NPRO_STORAGE_KEY);
-  readLoopActive = false;
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(NPRO_STORAGE_KEY);
+  }
+  cleanupSubscriptions();
   stopKeepAlive();
 
-  const device = nproDevice.value;
+  const device = nproChannel.value;
   if (device) {
     try {
-      await device.releaseInterface(NPRO_GAME_INTERFACE);
       await device.close();
     } catch (error) {
       console.error('[NPro] disconnect error:', error);
     }
   }
 
-  nproDevice.value = null;
+  nproChannel.value = null;
   nproConnected.value = false;
   nproPlayerSide.value = null;
   pendingInput = new Uint8Array(0);
@@ -216,10 +213,13 @@ export async function disconnectNpro() {
 }
 
 export async function tryAutoReconnectNpro() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(NPRO_STORAGE_KEY);
   if (!stored) return;
 
-  const devices = await navigator.usb.getDevices();
+  const devices = await transport.getAuthorizedUsbDevices();
   const device = devices.find(isNproDevice);
   if (!device) return;
 

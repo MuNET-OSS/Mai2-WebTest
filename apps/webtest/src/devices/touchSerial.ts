@@ -1,4 +1,5 @@
 import { ref, shallowRef } from 'vue';
+import { getTransport, type SerialChannel } from './transport';
 
 const touch = {
   a1: [0, 0],
@@ -37,29 +38,25 @@ const touch = {
   e8: [6, 3],
 } as const;
 
-export const touchPort = shallowRef<SerialPort | null>(null);
+export const touchChannel = shallowRef<SerialChannel | null>(null);
 export const touchConnected = ref(false);
+export const touchPortLabel = ref('');
 
-let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-let readLoopActive = false;
+let unsubData: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
 
-const SERIAL_OPTIONS: SerialOptions = {
+const SERIAL_OPTIONS = {
   baudRate: 9600,
-  dataBits: 8,
-  stopBits: 1,
-  parity: 'none',
+  dataBits: 8 as const,
+  stopBits: 1 as const,
+  parity: 'none' as const,
   bufferSize: 1,
-  flowControl: 'none',
+  flowControl: 'none' as const,
 };
 
 async function writeBytes(data: number[]) {
-  if (!touchPort.value?.writable) return;
-  const writer = touchPort.value.writable.getWriter();
-  try {
-    await writer.write(new Uint8Array(data));
-  } finally {
-    writer.releaseLock();
-  }
+  if (!touchChannel.value) return;
+  await touchChannel.value.write(new Uint8Array(data));
 }
 
 const writeString = (data: string) => {
@@ -78,53 +75,51 @@ function processReceivedByte(byte: number) {
   }
 }
 
-async function readLoop() {
-  if (!touchPort.value?.readable) return;
-  readLoopActive = true;
-  try {
-    reader = touchPort.value.readable.getReader();
-    while (readLoopActive) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (value) {
-        for (const byte of value) {
-          processReceivedByte(byte);
-        }
-      }
-    }
-  } catch (e) {
-    if (readLoopActive) console.error('Touch read error:', e);
-  } finally {
-    reader?.releaseLock();
-    reader = null;
-  }
-}
-
 const TOUCH_STORAGE_KEY = 'autoReconnect.touch';
 
-async function saveTouchPortInfo(port: SerialPort) {
-  const info = port.getInfo();
-  const ports = await navigator.serial.getPorts();
+async function saveTouchPortInfo(channel: SerialChannel) {
+  const info = channel.getInfo();
+  const ports = await getTransport().getAuthorizedSerialPorts();
   const sameDevicePorts = ports.filter(p => {
     const i = p.getInfo();
     return i.usbVendorId === info.usbVendorId && i.usbProductId === info.usbProductId;
   });
   localStorage.setItem(TOUCH_STORAGE_KEY, JSON.stringify({
     ...info,
-    sameDeviceIndex: sameDevicePorts.indexOf(port),
+    sameDeviceIndex: sameDevicePorts.indexOf(channel),
   }));
 }
 
-async function connectToPort(port: SerialPort) {
-  await port.open(SERIAL_OPTIONS);
-  touchPort.value = port;
-  touchConnected.value = true;
-  readLoop();
+function cleanupSubscriptions() {
+  unsubData?.();
+  unsubData = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
-  port.addEventListener('disconnect', () => {
+async function connectToPort(channel: SerialChannel, baudRate?: number) {
+  await channel.open({
+    ...SERIAL_OPTIONS,
+    baudRate: baudRate ?? SERIAL_OPTIONS.baudRate,
+  });
+
+  cleanupSubscriptions();
+  recvBuff = [];
+  touchChannel.value = channel;
+  touchConnected.value = true;
+  touchPortLabel.value = channel.label;
+
+  unsubData = channel.onData(chunk => {
+    for (const byte of chunk) {
+      processReceivedByte(byte);
+    }
+  });
+  unsubDisconnect = channel.onDisconnect(() => {
+    cleanupSubscriptions();
     touchConnected.value = false;
-    touchPort.value = null;
-    readLoopActive = false;
+    touchChannel.value = null;
+    touchPortLabel.value = '';
+    selectedZones.value = [];
   });
 
   console.log('串口已打开');
@@ -133,34 +128,41 @@ async function connectToPort(port: SerialPort) {
   await writeString('{STAT}');
 }
 
-export const serialConnect = async () => {
-  const port = await navigator.serial.requestPort();
-  await connectToPort(port);
-  await saveTouchPortInfo(port);
+export const serialConnect = async (portId?: string, baudRate?: number) => {
+  const transport = getTransport();
+  const channel = portId && transport.openSerialPortById
+    ? await transport.openSerialPortById(portId)
+    : await transport.requestSerialPort({ role: 'touch' });
+  await connectToPort(channel, baudRate);
+  if (transport.kind === 'web') {
+    await saveTouchPortInfo(channel);
+  }
 };
 
 export const closeSerial = async () => {
   console.log('closeSerial');
-  localStorage.removeItem(TOUCH_STORAGE_KEY);
-  if (!touchConnected.value) return;
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(TOUCH_STORAGE_KEY);
+  }
+  if (!touchConnected.value && !touchChannel.value) return;
   try {
     await writeString('{HALT}');
   } catch (e) {
     console.log(e);
   }
-  readLoopActive = false;
-  try {
-    reader?.cancel();
-  } catch (_) {}
-  if (touchPort.value) {
+  cleanupSubscriptions();
+  if (touchChannel.value) {
     try {
-      await touchPort.value.close();
+      await touchChannel.value.close();
     } catch (e) {
       console.error(e);
     }
   }
-  touchPort.value = null;
+  touchChannel.value = null;
   touchConnected.value = false;
+  touchPortLabel.value = '';
+  selectedZones.value = [];
 };
 
 export const selectedZones = ref<string[]>([]);
@@ -188,11 +190,14 @@ const processChunk = () => {
 const check = (data: readonly number[], offset: readonly [number, number]) => ((data[offset[0]] >> offset[1]) & 1) != 0;
 
 export async function tryAutoReconnectTouch() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(TOUCH_STORAGE_KEY);
   if (!stored) return;
 
   const savedInfo = JSON.parse(stored);
-  const ports = await navigator.serial.getPorts();
+  const ports = await transport.getAuthorizedSerialPorts();
   const sameDevicePorts = ports.filter(p => {
     const info = p.getInfo();
     return info.usbVendorId === savedInfo.usbVendorId &&

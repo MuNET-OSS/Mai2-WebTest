@@ -1,4 +1,5 @@
 import { ref, shallowRef } from 'vue';
+import { getTransport, type HidChannel } from './transport';
 
 // Maimoller HID - all-in-one IO (touch + buttons + LED)
 // VID 0x0E8F, PID 0x1224
@@ -37,7 +38,7 @@ const SYSTEM_BIT_MAP: Record<number, string> = {
   3: 'SELECT',
 };
 
-export const mmlDevice = shallowRef<HIDDevice | null>(null);
+export const mmlChannel = shallowRef<HidChannel | null>(null);
 export const mmlConnected = ref(false);
 export const mmlButtonStates = ref<Record<string, boolean>>({});
 export const mmlPlayer1Buttons = ref<boolean[]>(new Array(8).fill(false));
@@ -45,6 +46,15 @@ export const mmlSelectedZones = ref<string[]>([]);
 export const mmlPlayerSide = ref<'1P' | '2P' | null>(null);
 
 let inputReportCount = 0;
+let unsubInput: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
+
+function cleanupSubscriptions() {
+  unsubInput?.();
+  unsubInput = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
 function parseInputReport(reportId: number, data: DataView) {
   inputReportCount++;
@@ -101,23 +111,7 @@ function parseInputReport(reportId: number, data: DataView) {
   mmlPlayer1Buttons.value = p1Buttons;
 }
 
-function onInputReport(event: HIDInputReportEvent) {
-  parseInputReport(event.reportId, event.data);
-}
-
-function onHidDisconnect(e: HIDConnectionEvent) {
-  if (e.device === mmlDevice.value) {
-    console.log('[MML] device disconnected');
-    mmlDevice.value = null;
-    mmlConnected.value = false;
-    mmlButtonStates.value = {};
-    mmlPlayer1Buttons.value = new Array(8).fill(false);
-    mmlSelectedZones.value = [];
-    mmlPlayerSide.value = null;
-  }
-}
-
-async function findMaimollerDevice(devices: HIDDevice[]): Promise<{ device: HIDDevice; player: '1P' | '2P' } | null> {
+async function findMaimollerDevice(devices: HidChannel[]): Promise<{ device: HidChannel; player: '1P' | '2P' } | null> {
   const candidates = devices.filter(d => d.vendorId === MML_VID && d.productId === MML_PID);
   console.log(`[MML] ${candidates.length} candidate(s):`, candidates.map(d => `"${d.productName}"`));
 
@@ -136,49 +130,70 @@ async function findMaimollerDevice(devices: HIDDevice[]): Promise<{ device: HIDD
   return null;
 }
 
-async function connectToDevice(device: HIDDevice, player: '1P' | '2P') {
+async function connectToDevice(device: HidChannel, player: '1P' | '2P') {
   if (!device.opened) await device.open();
 
-  device.removeEventListener('inputreport', onInputReport);
-  device.addEventListener('inputreport', onInputReport);
+  cleanupSubscriptions();
   inputReportCount = 0;
 
-  mmlDevice.value = device;
+  mmlChannel.value = device;
   mmlConnected.value = true;
   mmlPlayerSide.value = player;
   console.log(`[MML] connected to "${device.productName}" as ${player}`);
 
-  navigator.hid.removeEventListener('disconnect', onHidDisconnect as EventListener);
-  navigator.hid.addEventListener('disconnect', onHidDisconnect as EventListener);
+  unsubInput = device.onInputReport((reportId, data) => {
+    parseInputReport(reportId, data);
+  });
+  unsubDisconnect = device.onDisconnect(() => {
+    console.log('[MML] device disconnected');
+    cleanupSubscriptions();
+    mmlChannel.value = null;
+    mmlConnected.value = false;
+    mmlButtonStates.value = {};
+    mmlPlayer1Buttons.value = new Array(8).fill(false);
+    mmlSelectedZones.value = [];
+    mmlPlayerSide.value = null;
+  });
 }
 
-export async function connectMML() {
-  const devices = await navigator.hid.requestDevice({
-    filters: [{ vendorId: MML_VID, productId: MML_PID }],
-  });
+export async function connectMML(deviceId?: string) {
+  const transport = getTransport();
+  const devices = deviceId && transport.openHidDeviceById
+    ? [await transport.openHidDeviceById(deviceId)]
+    : await transport.requestHidDevices([{ vendorId: MML_VID, productId: MML_PID }]);
 
   const result = await findMaimollerDevice(devices);
   if (!result) {
-    console.error('[MML] no valid Maimoller device found among', devices.length, 'device(s)');
+    const msg = `[MML] no valid Maimoller device found among ${devices.length} device(s)`;
+    console.error(msg);
+    if (deviceId) {
+      throw new Error('所选设备不支持 Maimoller 控制协议');
+    }
     return;
   }
 
   await connectToDevice(result.device, result.player);
-  localStorage.setItem(MML_STORAGE_KEY, 'true');
+  if (transport.kind === 'web') {
+    localStorage.setItem(MML_STORAGE_KEY, 'true');
+  }
 }
 
 export async function disconnectMML() {
   console.log('[MML] disconnecting...');
-  localStorage.removeItem(MML_STORAGE_KEY);
-  if (!mmlDevice.value) return;
-  try {
-    mmlDevice.value.removeEventListener('inputreport', onInputReport as EventListener);
-    await mmlDevice.value.close();
-    console.log('[MML] device closed');
-  } catch (e) {
-    console.error('[MML] disconnect error:', e);
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(MML_STORAGE_KEY);
   }
-  mmlDevice.value = null;
+  cleanupSubscriptions();
+  if (mmlChannel.value) {
+    try {
+      await mmlChannel.value.close();
+      console.log('[MML] device closed');
+    } catch (e) {
+      console.error('[MML] disconnect error:', e);
+    }
+  }
+  mmlChannel.value = null;
   mmlConnected.value = false;
   mmlButtonStates.value = {};
   mmlPlayer1Buttons.value = new Array(8).fill(false);
@@ -188,10 +203,13 @@ export async function disconnectMML() {
 }
 
 export async function tryAutoReconnectMML() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(MML_STORAGE_KEY);
   if (!stored) return;
 
-  const devices = await navigator.hid.getDevices();
+  const devices = await transport.getAuthorizedHidDevices();
   const result = await findMaimollerDevice(devices);
   if (!result) {
     console.warn('[MML] auto-reconnect: no valid device found');
@@ -209,11 +227,11 @@ let lastOutputReport: Uint8Array<ArrayBuffer> = new Uint8Array(OUTPUT_REPORT_SIZ
 
 function sendReport(report: Uint8Array<ArrayBuffer>) {
   lastOutputReport = new Uint8Array(report);
-  return mmlDevice.value!.sendReport(MML_REPORT_ID, report);
+  return mmlChannel.value!.sendReport(MML_REPORT_ID, report);
 }
 
 export async function mmlSetAllButtonColor(r: number, g: number, b: number) {
-  if (!mmlDevice.value || !mmlConnected.value) return;
+  if (!mmlChannel.value || !mmlConnected.value) return;
   const report = new Uint8Array(lastOutputReport);
   for (let i = 0; i < 8; i++) {
     report[i * 3] = r;
@@ -224,7 +242,7 @@ export async function mmlSetAllButtonColor(r: number, g: number, b: number) {
 }
 
 export async function mmlSetTopLightColor(r: number, g: number, b: number) {
-  if (!mmlDevice.value || !mmlConnected.value) return;
+  if (!mmlChannel.value || !mmlConnected.value) return;
   const report = new Uint8Array(lastOutputReport);
   report[27] = Math.max(0, Math.min(255, Math.floor(r)));
   report[28] = Math.max(0, Math.min(255, Math.floor(g)));
@@ -233,7 +251,7 @@ export async function mmlSetTopLightColor(r: number, g: number, b: number) {
 }
 
 export async function mmlSetFrameBrightness(value: number) {
-  if (!mmlDevice.value || !mmlConnected.value) return;
+  if (!mmlChannel.value || !mmlConnected.value) return;
   const v = Math.max(0, Math.min(255, Math.floor(value)));
   const report = new Uint8Array(lastOutputReport);
   report[24] = v;

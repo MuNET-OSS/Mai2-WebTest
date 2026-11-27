@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import type { TestDeviceProvider } from './types';
 import { pdxConnected, pdxSelectedZones, connectPDX, disconnectPDX, tryAutoReconnectPDX } from '@/devices/pdxUsb';
-import { ledConnected, connectLed, disconnectLed, setAllLedColor, setFrameLightBrightness, tryAutoReconnectLed } from '@/devices/ledSerial';
+import { ledConnected, ledPortLabel, connectLed, disconnectLed, setAllLedColor, setFrameLightBrightness, tryAutoReconnectLed } from '@/devices/ledSerial';
 import { io4Connected, buttonStates, player1Buttons, connectIO4, disconnectIO4, tryAutoReconnectIO4, setTopLightColor } from '@/devices/io4';
 
 export const pdxProvider: TestDeviceProvider = {
@@ -37,9 +37,36 @@ export const pdxProvider: TestDeviceProvider = {
   },
 
   connections: [
-    { key: 'pdx', label: 'PDX 触摸', hint: 'WinUSB Device', connected: pdxConnected, connect: connectPDX, disconnect: disconnectPDX },
-    { key: 'led', label: 'LED', hint: 'COM21 / COM23', connected: ledConnected, connect: connectLed, disconnect: disconnectLed },
-    { key: 'io4', label: 'IO4', hint: 'HID Device', connected: io4Connected, connect: connectIO4, disconnect: disconnectIO4 },
+    {
+      key: 'pdx',
+      kind: 'usb-pdx',
+      label: 'PDX 触摸',
+      hint: 'WinUSB Device',
+      connected: pdxConnected,
+      connect: () => connectPDX(),
+      connectById: id => connectPDX(id),
+      disconnect: disconnectPDX,
+    },
+    {
+      key: 'led',
+      kind: 'serial-led',
+      label: 'LED',
+      hint: computed(() => ledPortLabel.value || 'COM21 / COM23'),
+      connected: ledConnected,
+      connect: () => connectLed(),
+      connectById: id => connectLed(id),
+      disconnect: disconnectLed,
+    },
+    {
+      key: 'io4',
+      kind: 'hid-io4',
+      label: 'IO4',
+      hint: 'HID Device',
+      connected: io4Connected,
+      connect: () => connectIO4(),
+      connectById: id => connectIO4(id),
+      disconnect: disconnectIO4,
+    },
   ],
 
   lifecycle: {

@@ -40,7 +40,7 @@ async function tryRestoreModeConnections(from: DeviceMode, to: DeviceMode) {
   await providers[to].lifecycle.tryAutoReconnectPresentedConnections();
 }
 
-export async function setDeviceMode(nextMode: DeviceMode) {
+export async function setDeviceMode(nextMode: DeviceMode, options?: { skipAutoReconnect?: boolean }) {
   const prevMode = deviceMode.value;
   if (prevMode === nextMode) return;
 
@@ -48,7 +48,9 @@ export async function setDeviceMode(nextMode: DeviceMode) {
   try {
     await transitionDeviceMode(prevMode, nextMode);
     deviceMode.value = nextMode;
-    await tryRestoreModeConnections(prevMode, nextMode);
+    if (!options?.skipAutoReconnect) {
+      await tryRestoreModeConnections(prevMode, nextMode);
+    }
   } finally {
     switchingDeviceMode.value = false;
   }

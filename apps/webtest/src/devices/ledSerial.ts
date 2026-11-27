@@ -7,15 +7,17 @@ import {
   LED_ESCAPE,
   LED_SYNC,
 } from './ledProtocol';
+import { getTransport, type SerialChannel } from './transport';
 
 const LED_BAUD_RATE = 115200;
 
-export const ledPort = shallowRef<SerialPort | null>(null);
+export const ledChannel = shallowRef<SerialChannel | null>(null);
 export const ledConnected = ref(false);
+export const ledPortLabel = ref('');
 export const ledLastAck = shallowRef<number[]>([]);
 
-let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-let readLoopActive = false;
+let unsubData: (() => void) | null = null;
+let unsubDisconnect: (() => void) | null = null;
 
 let recvBuf: number[] = [];
 let recvEscape = false;
@@ -54,94 +56,91 @@ function processReceivedByte(byte: number) {
   }
 }
 
-async function readLoop() {
-  if (!ledPort.value?.readable) return;
-  readLoopActive = true;
-  try {
-    reader = ledPort.value.readable.getReader();
-    while (readLoopActive) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (value) {
-        for (const byte of value) {
-          processReceivedByte(byte);
-        }
-      }
-    }
-  } catch (e) {
-    if (readLoopActive) console.error('LED read error:', e);
-  } finally {
-    reader?.releaseLock();
-    reader = null;
-  }
-}
-
 async function writePacket(packet: Uint8Array) {
-  if (!ledPort.value?.writable) return;
-  const writer = ledPort.value.writable.getWriter();
-  try {
-    await writer.write(packet);
-  } finally {
-    writer.releaseLock();
-  }
+  if (!ledChannel.value) return;
+  await ledChannel.value.write(packet);
 }
 
 const LED_STORAGE_KEY = 'autoReconnect.led';
 
-async function saveLedPortInfo(port: SerialPort) {
-  const info = port.getInfo();
-  const ports = await navigator.serial.getPorts();
+async function saveLedPortInfo(channel: SerialChannel) {
+  const info = channel.getInfo();
+  const ports = await getTransport().getAuthorizedSerialPorts();
   const sameDevicePorts = ports.filter(p => {
     const i = p.getInfo();
     return i.usbVendorId === info.usbVendorId && i.usbProductId === info.usbProductId;
   });
   localStorage.setItem(LED_STORAGE_KEY, JSON.stringify({
     ...info,
-    sameDeviceIndex: sameDevicePorts.indexOf(port),
+    sameDeviceIndex: sameDevicePorts.indexOf(channel),
   }));
 }
 
-async function connectToPort(port: SerialPort) {
-  await port.open({ baudRate: LED_BAUD_RATE });
-  ledPort.value = port;
-  ledConnected.value = true;
-  readLoop();
+function cleanupSubscriptions() {
+  unsubData?.();
+  unsubData = null;
+  unsubDisconnect?.();
+  unsubDisconnect = null;
+}
 
-  port.addEventListener('disconnect', () => {
+async function connectToPort(channel: SerialChannel) {
+  await channel.open({ baudRate: LED_BAUD_RATE });
+
+  cleanupSubscriptions();
+  recvBuf = [];
+  recvSynced = false;
+  recvEscape = false;
+  ledChannel.value = channel;
+  ledConnected.value = true;
+  ledPortLabel.value = channel.label;
+
+  unsubData = channel.onData(chunk => {
+    for (const byte of chunk) {
+      processReceivedByte(byte);
+    }
+  });
+  unsubDisconnect = channel.onDisconnect(() => {
+    cleanupSubscriptions();
     ledConnected.value = false;
-    ledPort.value = null;
-    readLoopActive = false;
+    ledChannel.value = null;
+    ledPortLabel.value = '';
   });
 }
 
-export async function connectLed() {
-  const port = await navigator.serial.requestPort();
-  await connectToPort(port);
-  await saveLedPortInfo(port);
+export async function connectLed(portId?: string) {
+  const transport = getTransport();
+  const channel = portId && transport.openSerialPortById
+    ? await transport.openSerialPortById(portId)
+    : await transport.requestSerialPort({ role: 'led' });
+  await connectToPort(channel);
+  if (transport.kind === 'web') {
+    await saveLedPortInfo(channel);
+  }
 }
 
 export async function disconnectLed() {
-  localStorage.removeItem(LED_STORAGE_KEY);
-  readLoopActive = false;
-  try {
-    reader?.cancel();
-  } catch (_) {}
-  if (ledPort.value) {
+  const transport = getTransport();
+  if (transport.kind === 'web') {
+    localStorage.removeItem(LED_STORAGE_KEY);
+  }
+  cleanupSubscriptions();
+  if (ledChannel.value) {
     try {
-      await ledPort.value.close();
+      await ledChannel.value.close();
     } catch (e) {
       console.error(e);
     }
   }
-  ledPort.value = null;
+  ledChannel.value = null;
   ledConnected.value = false;
+  ledPortLabel.value = '';
   recvBuf = [];
   recvSynced = false;
   recvEscape = false;
 }
 
 export async function setAllLedColor(r: number, g: number, b: number) {
-  if (!ledPort.value || !ledConnected.value) return;
+  if (!ledChannel.value || !ledConnected.value) return;
 
   const setColorPacket = buildLedSetAllButtonPacket(r, g, b);
   console.log('setColorPacket', setColorPacket);
@@ -154,18 +153,21 @@ export async function setAllLedColor(r: number, g: number, b: number) {
 }
 
 export async function setFrameLightBrightness(value: number) {
-  if (!ledPort.value || !ledConnected.value) return;
+  if (!ledChannel.value || !ledConnected.value) return;
 
   const packet = buildLedFrameBrightnessPacket(value);
   await writePacket(packet);
 }
 
 export async function tryAutoReconnectLed() {
+  const transport = getTransport();
+  if (transport.kind !== 'web') return;
+
   const stored = localStorage.getItem(LED_STORAGE_KEY);
   if (!stored) return;
 
   const savedInfo = JSON.parse(stored);
-  const ports = await navigator.serial.getPorts();
+  const ports = await transport.getAuthorizedSerialPorts();
   const sameDevicePorts = ports.filter(p => {
     const info = p.getInfo();
     return info.usbVendorId === savedInfo.usbVendorId &&
